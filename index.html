@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decline Curve Analysis (DCA) - Professional</title>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* STREAMLIT-LIKE STYLING */
+        :root {
+            --primary-color: #ff4b4b;
+            --secondary-color: #0083B8;
+            --text-color: #31333F;
+            --bg-color: #ffffff;
+            --sidebar-bg: #f0f2f6;
+            --font-family: 'Source Sans Pro', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        #sidebar {
+            width: 450px; /* UPDATED: Diperlebar dari 380px ke 450px */
+            background-color: var(--sidebar-bg);
+            padding: 2rem 1.5rem;
+            overflow-y: auto;
+            flex-shrink: 0;
+            border-right: 1px solid rgba(0,0,0,0.05);
+            transition: margin-left 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            #sidebar {
+                position: absolute;
+                z-index: 50;
+                height: 100%;
+                margin-left: -450px; /* UPDATED: Disesuaikan dengan width baru agar hidden sempurna */
+            }
+            #sidebar.open {
+                margin-left: 0;
+                box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+            }
+        }
+
+        #main-container {
+            flex-grow: 1;
+            padding: 2rem 3rem;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        @media (max-width: 640px) {
+            #main-container { padding: 1rem; }
+        }
+
+        /* UI Elements */
+        .slider-container { margin-bottom: 1.5rem; }
+        
+        .slider-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;
+        }
+        
+        .slider-label { font-size: 13px; font-weight: 600; color: var(--text-color); }
+        
+        .val-input {
+            width: 80px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #333;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 2px 5px;
+            text-align: right;
+        }
+        .val-input:focus { border-color: var(--primary-color); outline: none; }
+
+        input[type=range] {
+            -webkit-appearance: none; appearance: none; width: 100%; background: transparent; cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px; cursor: pointer; background: #d1d5db; border-radius: 3px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+            background: var(--primary-color); margin-top: -5px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); border: 2px solid white;
+        }
+
+        .st-button {
+            background-color: #ffffff; color: var(--text-color); border: 1px solid rgba(49, 51, 63, 0.2);
+            border-radius: 0.5rem; padding: 0.5rem 1rem; font-weight: 600; cursor: pointer; width: 100%;
+            transition: all 0.2s; font-size: 14px; margin-bottom: 0.5rem;
+        }
+        .st-button:hover { border-color: var(--primary-color); color: var(--primary-color); }
+        .st-button.primary { background-color: var(--primary-color); color: white; border: none; }
+        .st-button.primary:hover { background-color: #ff3333; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .st-button.success { background-color: var(--secondary-color); color: white; border: none; }
+        .st-button.success:hover { background-color: #006892; }
+
+        .st-radio-group { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .st-radio-option { display: flex; align-items: center; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .st-radio-option input { margin-right: 0.5rem; accent-color: var(--primary-color); }
+
+        .st-textarea { border: 1px solid #d6d6d8; border-radius: 0.25rem; padding: 8px; width: 100%; font-size: 12px; font-family: monospace; min-height: 100px; resize: vertical; }
+        .st-date-input { border: 1px solid #d6d6d8; border-radius: 0.25rem; padding: 4px 8px; width: 100%; font-size: 13px; color: #333; }
+
+        .hamburger { position: absolute; top: 0.5rem; left: 0.5rem; cursor: pointer; padding: 0.5rem; z-index: 60; color: #555; display: none; }
+        @media (max-width: 768px) { .hamburger { display: block; } }
+        .top-right-decoration { position: absolute; top: 0; right: 0; height: 4px; width: 100%; background: linear-gradient(90deg, #ff4b4b 0%, #ff4b4b 100%); z-index: 100; }
+        
+        #loadingOverlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8); z-index: 200; align-items: center; justify-content: center;
+        }
+
+        .input-tab { display: none; }
+        .input-tab.active { display: block; }
+
+        /* Project File Input Hidden */
+        #projectFileInput { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="top-right-decoration"></div>
+    
+    <div id="loadingOverlay">
+        <div class="text-center">
+            <svg class="animate-spin h-8 w-8 text-red-500 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <div class="font-bold text-gray-700">Running Regression...</div>
+        </div>
+    </div>
+
+    <div class="hamburger" onclick="toggleSidebar()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+        
+        <h2 style="font-size: 1.5rem; margin-top: 0; margin-bottom: 1rem;">Decline Curve Parameters</h2>
+        
+        <!-- FLUID TYPE -->
+        <label class="slider-label">Fluid Type</label>
+        <div class="st-radio-group">
+            <label class="st-radio-option">
+                <input type="radio" name="fluidType" value="oil" checked onchange="updateFluidSettings()"> Oil
+            </label>
+            <label class="st-radio-option">
+                <input type="radio" name="fluidType" value="gas" onchange="updateFluidSettings()"> Gas
+            </label>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1rem 0;">
+
+        <!-- PARAMETER SLIDERS -->
+        <div class="slider-container">
+            <div class="slider-header">
+                <span class="slider-label">Initial Rate, qi (<span id="unit-qi">BOPD</span>)</span>
+                <input type="number" id="input-qi-num" class="val-input" onchange="syncInput('qi', 'num')">
+            </div>
+            <input type="range" id="input-qi" min="10" max="2000" step="1" oninput="syncInput('qi', 'slider')">
+        </div>
+
+        <div class="slider-container">
+            <div class="slider-header">
+                <span class="slider-label">Initial Decline, Di (%/year)</span>
+                <input type="number" id="input-di-num" class="val-input" onchange="syncInput('di', 'num')">
+            </div>
+            <input type="range" id="input-di" min="1" max="300" step="0.5" value="20" oninput="syncInput('di', 'slider')">
+        </div>
+
+        <div class="slider-container">
+            <div class="slider-header">
+                <span class="slider-label">Hyperbolic Exponent, b</span>
+                <input type="number" id="input-b-num" class="val-input" step="0.05" onchange="syncInput('b', 'num')">
+            </div>
+            <!-- UPDATED: Max value set to 1.0 -->
+            <input type="range" id="input-b" min="0" max="1.0" step="0.05" value="0.5" oninput="syncInput('b', 'slider')">
+            <div class="text-[10px] text-gray-400 mt-1 italic">Note: If b=0, it is Exponential</div>
+        </div>
+
+        <div class="slider-container">
+            <div class="slider-header">
+                <span class="slider-label">Forecast Start Date</span>
+            </div>
+            <input type="date" id="input-date-start" class="st-date-input" onchange="handleDateInput()">
+            <div class="mt-2 flex justify-between items-center text-xs text-gray-500">
+                <span>Shift (Months): <span id="val-time-shift" class="font-mono text-primary font-bold">0</span></span>
+            </div>
+            <input type="range" id="input-time-shift" min="-60" max="60" step="1" value="0" oninput="handleTimeShiftSlider()">
+        </div>
+
+        <div class="slider-container">
+            <div class="slider-header">
+                <span class="slider-label">Forecast Duration (Months)</span>
+                <input type="number" id="input-months-num" class="val-input" onchange="syncInput('months', 'num')">
+            </div>
+            <input type="range" id="input-months" min="1" max="600" step="1" value="120" oninput="syncInput('months', 'slider')">
+        </div>
+
+        <div class="slider-container">
+            <div class="slider-header">
+                <span class="slider-label">Economic Limit (<span id="unit-el">BOPD</span>)</span>
+                <input type="number" id="input-el-num" class="val-input" onchange="syncInput('el', 'num')">
+            </div>
+            <input type="range" id="input-el" min="0" max="500" step="1" value="50" oninput="syncInput('el', 'slider')">
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1.5rem 0;">
+
+        <!-- REGRESSION CONTROLS -->
+        <label class="slider-label" style="display:block; margin-bottom:0.5rem; color:var(--secondary-color);">Auto-Fit Regression</label>
+        
+        <!-- Checkbox to Enable/Disable Window -->
+        <div class="flex items-center gap-2 mb-2">
+             <input type="checkbox" id="check-reg-window" onchange="toggleRegWindow()" class="w-3 h-3 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
+             <label for="check-reg-window" class="text-xs font-medium text-gray-700 cursor-pointer">Enable Regression Window</label>
+        </div>
+
+        <div id="reg-window-container" class="bg-blue-50 p-3 rounded border border-blue-100 mb-2" style="display:none;">
+            <div class="flex justify-between text-xs mb-1 text-gray-600">
+                <span>Start Date</span>
+                <span id="reg-start-date" class="font-mono font-bold">-</span>
+            </div>
+            <input type="range" id="input-reg-start" min="0" max="10" step="1" value="0" oninput="updateRegressionUI()">
+            
+            <div class="flex justify-between text-xs mt-2 mb-1 text-gray-600">
+                <span>End Date</span>
+                <span id="reg-end-date" class="font-mono font-bold">-</span>
+            </div>
+            <input type="range" id="input-reg-end" min="0" max="10" step="1" value="10" oninput="updateRegressionUI()">
+            
+            <div class="text-[10px] text-gray-400 mt-2 text-center">Select data range used for Auto-Fit</div>
+        </div>
+
+        <button class="st-button success" onclick="runRegression()">⚡ Auto-Fit (Regression)</button>
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1.5rem 0;">
+
+        <!-- HISTORICAL DATA SOURCE -->
+        <label class="slider-label" style="display:block; margin-bottom:0.5rem;">Historical Data Source</label>
+        <div class="flex gap-2 mb-4 text-xs">
+            <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('example')">Example</button>
+            <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('upload')">Upload</button>
+            <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('paste')">Paste</button>
+        </div>
+
+        <!-- TAB: EXAMPLE -->
+        <div id="tab-example" class="input-tab bg-blue-50 p-3 rounded border border-blue-100 mb-4">
+            <div class="text-xs text-blue-800 mb-2">Use built-in example data.</div>
+            <button class="st-button primary" onclick="loadExampleData()" style="margin:0; font-size:12px;">Load Example Data</button>
+        </div>
+
+        <!-- TAB: UPLOAD -->
+        <div id="tab-upload" class="input-tab bg-white p-3 rounded border mb-4">
+             <div class="text-xs text-gray-500 mb-2"><b>CSV File</b> (Col 1: Date, Col 2: Rate)</div>
+             <input type="file" id="csvFile" accept=".csv" onchange="handleFileUpload(this)" style="font-size: 11px; width: 100%;">
+        </div>
+
+        <!-- TAB: PASTE -->
+        <div id="tab-paste" class="input-tab bg-white p-3 rounded border mb-4">
+            <div class="text-xs text-gray-500 mb-2">Format: <code>YYYY-MM-DD [tab] Rate</code></div>
+            <textarea id="historyPasteArea" class="st-textarea" placeholder="2023-01-01	1500..." oninput="handleHistoryPaste(this.value)"></textarea>
+            <button class="st-button" onclick="clearHistory()" style="margin-top:5px; font-size:12px;">Clear Data</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1.5rem 0;">
+
+        <!-- PROJECT MANAGEMENT (MOVED HERE) -->
+        <div class="mb-6 p-3 bg-gray-100 rounded border border-gray-200">
+            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Project Management</h3>
+            <div class="flex gap-2">
+                <button class="st-button success" onclick="saveProjectCSV()" style="margin:0; font-size:12px;">
+                    <i class="fas fa-file-csv mr-1"></i> Save CSV
+                </button>
+                <button class="st-button" onclick="document.getElementById('projectFileInput').click()" style="margin:0; font-size:12px;">
+                    <i class="fas fa-folder-open mr-1"></i> Load File
+                </button>
+                <!-- Allow both json and csv -->
+                <input type="file" id="projectFileInput" accept=".json,.csv,.txt" onchange="loadProject(this)">
+            </div>
+            <div class="text-[10px] text-gray-400 mt-1">Supports editable CSV format.</div>
+        </div>
+
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main-container">
+        <h1 class="text-2xl font-bold mb-4">Decline Curve Analysis (DCA)</h1>
+        
+        <div class="flex items-center gap-2 mb-4">
+            <input type="checkbox" id="logScaleToggle" onchange="updateDCA(false)" class="w-4 h-4 text-red-600 rounded">
+            <label for="logScaleToggle" class="text-sm font-medium">Logarithmic Scale (Semi-Log)</label>
+        </div>
+
+        <!-- Plotly Chart -->
+        <div id="dcaChart" style="width: 100%; height: 550px; margin-bottom: 2rem; border: 1px solid #eee; border-radius: 8px;"></div>
+
+        <!-- Results Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white border p-4 rounded-lg shadow-sm">
+                <div class="text-xs text-gray-500">EUR (Est. Ult. Recovery)</div>
+                <div class="text-2xl font-bold text-red-500">
+                    <span id="res-eur">0.00</span> <span class="text-sm text-gray-700 unit-vol">MBO</span>
+                </div>
+            </div>
+            <div class="bg-white border p-4 rounded-lg shadow-sm">
+                <div class="text-xs text-gray-500">Remaining Reserves</div>
+                <div class="text-2xl font-bold text-green-500">
+                    <span id="res-rem">0.00</span> <span class="text-sm text-gray-700 unit-vol">MBO</span>
+                </div>
+            </div>
+            <div class="bg-white border p-4 rounded-lg shadow-sm">
+                <div class="text-xs text-gray-500">Cum. Production (Hist)</div>
+                <div class="text-2xl font-bold text-gray-800">
+                    <span id="res-cum">0.00</span> <span class="text-sm text-gray-700 unit-vol">MBO</span>
+                </div>
+            </div>
+             <div class="bg-white border p-4 rounded-lg shadow-sm">
+                <div class="text-xs text-gray-500">Est. End of Life</div>
+                <div class="text-lg font-bold text-gray-800">
+                    <span id="res-eol">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FORECAST TABLE SECTION -->
+        <div class="flex justify-between items-center mb-2">
+            <h3 class="font-bold">Forecast Table</h3>
+            <div class="flex items-center gap-2">
+                <div class="flex bg-gray-100 rounded p-1 text-xs">
+                    <button class="px-3 py-1 rounded bg-white shadow-sm font-semibold" id="btn-month" onclick="setTableView('month')">Monthly</button>
+                    <button class="px-3 py-1 rounded hover:bg-white hover:shadow-sm transition-all" id="btn-day" onclick="setTableView('day')">Daily</button>
+                    <button class="px-3 py-1 rounded hover:bg-white hover:shadow-sm transition-all" id="btn-year" onclick="setTableView('year')">Yearly</button>
+                </div>
+                
+                <button id="btn-copy" onclick="copyTable()" class="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 transition-colors flex items-center gap-1">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+
+                <button onclick="downloadCSV()" class="px-3 py-1 bg-green-600 text-white text-xs font-semibold rounded hover:bg-green-700 transition-colors flex items-center gap-1">
+                    <i class="fas fa-download"></i> CSV
+                </button>
+            </div>
+        </div>
+        
+        <div style="overflow-x: auto; font-size: 12px; max-height: 400px; border: 1px solid #eee; border-radius: 4px;">
+            <table class="w-full text-left border-collapse relative">
+                <thead class="sticky top-0 bg-gray-50 shadow-sm z-10">
+                    <tr class="border-b">
+                        <th class="p-2">Date / Year</th>
+                        <th class="p-2">Rate (<span class="unit-rate">BOPD</span>)</th>
+                        <th class="p-2">Volume (<span class="unit-vol-small">Bbl</span>)</th>
+                        <th class="p-2">Cummulative Forecast (<span class="unit-vol">MBO</span>)</th>
+                    </tr>
+                </thead>
+                <tbody id="forecastTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE ---
+        let fluidType = 'oil'; 
+        let historyData = []; 
+        let tableView = 'month';
+        let currentForecastData = []; 
+
+        // Init Input Tabs
+        function switchInputTab(tabName) {
+            document.querySelectorAll('.input-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+        switchInputTab('example');
+
+        // --- 0. PROJECT MANAGEMENT (CSV / JSON) ---
+        
+        function saveProjectCSV() {
+            // Create a human readable CSV format
+            
+            let csv = "[PARAMETERS]\nParameter,Value\n";
+            csv += `fluidType,${fluidType}\n`;
+            csv += `qi,${document.getElementById('input-qi').value}\n`;
+            csv += `di,${document.getElementById('input-di').value}\n`;
+            csv += `b,${document.getElementById('input-b').value}\n`;
+            csv += `months,${document.getElementById('input-months').value}\n`;
+            csv += `el,${document.getElementById('input-el').value}\n`;
+            csv += `dateStart,${document.getElementById('input-date-start').value}\n`;
+            csv += `timeShift,${document.getElementById('input-time-shift').value}\n`;
+            csv += `regEnabled,${document.getElementById('check-reg-window').checked}\n`;
+            csv += `regStart,${document.getElementById('input-reg-start').value}\n`;
+            csv += `regEnd,${document.getElementById('input-reg-end').value}\n`;
+            csv += `logScale,${document.getElementById('logScaleToggle').checked}\n`;
+            
+            csv += "\n[HISTORY]\nDate,Rate\n";
+            historyData.forEach(d => {
+                const dateStr = d.date.toISOString().split('T')[0];
+                csv += `${dateStr},${d.q}\n`;
+            });
+
+            const dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "dca_project_data.csv");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function loadProject(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                
+                // Detect if JSON or CSV
+                if(content.trim().startsWith("{")) {
+                    loadJSONProject(content);
+                } else if(content.includes("[PARAMETERS]")) {
+                    loadCSVProject(content);
+                } else {
+                    alert("Unknown file format. Please load a valid .json or .csv project file.");
+                }
+            };
+            reader.readAsText(file);
+            input.value = '';
+        }
+
+        function loadCSVProject(csvText) {
+            try {
+                const lines = csvText.split(/\r?\n/);
+                let section = "";
+                let params = {};
+                let newHistory = [];
+
+                lines.forEach(line => {
+                    const cleanLine = line.trim();
+                    if(!cleanLine) return;
+                    
+                    if(cleanLine === "[PARAMETERS]") { section = "PARAMS"; return; }
+                    if(cleanLine === "[HISTORY]") { section = "HISTORY"; return; }
+                    
+                    if(section === "PARAMS") {
+                        const parts = cleanLine.split(",");
+                        if(parts.length >= 2 && parts[0] !== "Parameter") {
+                            // Simple Key Value
+                            let val = parts[1];
+                            if(val === "true") val = true;
+                            if(val === "false") val = false;
+                            params[parts[0]] = val;
+                        }
+                    } else if(section === "HISTORY") {
+                        const parts = cleanLine.split(",");
+                        if(parts.length >= 2 && parts[0] !== "Date") {
+                            const d = new Date(parts[0]);
+                            const q = parseFloat(parts[1]);
+                            if(!isNaN(d.getTime()) && !isNaN(q)) {
+                                newHistory.push({date: d, q: q});
+                            }
+                        }
+                    }
+                });
+
+                applyLoadedData(params, newHistory);
+                alert("CSV Project loaded successfully!");
+
+            } catch (err) {
+                console.error(err);
+                alert("Error parsing CSV project file.");
+            }
+        }
+
+        function loadJSONProject(jsonText) {
+            try {
+                const state = JSON.parse(jsonText);
+                
+                // Convert JSON structure to flat params for common applier
+                const params = {
+                    fluidType: state.fluidType,
+                    qi: state.params.qi,
+                    di: state.params.di,
+                    b: state.params.b,
+                    months: state.params.months,
+                    el: state.params.el,
+                    dateStart: state.params.dateStart,
+                    timeShift: state.params.timeShift,
+                    regEnabled: state.regression ? state.regression.enabled : false,
+                    regStart: state.regression ? state.regression.start : 0,
+                    regEnd: state.regression ? state.regression.end : 10,
+                    logScale: state.logScale
+                };
+
+                const newHistory = (state.historyData || []).map(d => ({ date: new Date(d.date), q: d.q }));
+                
+                applyLoadedData(params, newHistory);
+                alert("JSON Project loaded successfully!");
+
+            } catch(err) {
+                console.error(err);
+                alert("Error parsing JSON project file.");
+            }
+        }
+
+        function applyLoadedData(params, newHistory) {
+            // 1. Fluid
+            fluidType = params.fluidType || 'oil';
+            const radios = document.getElementsByName('fluidType');
+            for(const r of radios) { 
+                if(r.value === fluidType) r.checked = true; 
+            }
+            updateFluidSettings();
+
+            // 2. History
+            if(newHistory.length > 0) {
+                // Re-process to add t_months etc
+                const sorted = newHistory.sort((a,b) => a.date - b.date);
+                const startMs = sorted[0].date.getTime();
+                historyData = sorted.map(d => ({
+                    date: d.date,
+                    q: d.q,
+                    t_months: (d.date.getTime() - startMs) / (1000 * 60 * 60 * 24 * 30.44)
+                }));
+                initRegressionSliders(); 
+            } else {
+                historyData = [];
+            }
+
+            // 3. Parameters
+            if(params.qi) document.getElementById('input-qi').value = params.qi;
+            if(params.di) document.getElementById('input-di').value = params.di;
+            if(params.b) document.getElementById('input-b').value = params.b;
+            if(params.months) document.getElementById('input-months').value = params.months;
+            if(params.el) document.getElementById('input-el').value = params.el;
+
+            ['qi', 'di', 'b', 'months', 'el'].forEach(id => {
+                document.getElementById(`input-${id}-num`).value = document.getElementById(`input-${id}`).value;
+            });
+
+            if(params.dateStart) document.getElementById('input-date-start').value = params.dateStart;
+            if(params.timeShift) {
+                document.getElementById('input-time-shift').value = params.timeShift;
+                document.getElementById('val-time-shift').innerText = (parseInt(params.timeShift) > 0 ? "+" : "") + params.timeShift;
+            }
+
+            // 4. Regression UI
+            document.getElementById('check-reg-window').checked = (String(params.regEnabled) === "true");
+            toggleRegWindow();
+            if(params.regStart) document.getElementById('input-reg-start').value = params.regStart;
+            if(params.regEnd) document.getElementById('input-reg-end').value = params.regEnd;
+            updateRegressionUI();
+
+            // 5. Log Scale
+            if(params.logScale !== undefined) {
+                document.getElementById('logScaleToggle').checked = (String(params.logScale) === "true");
+            }
+
+            updateDCA(false);
+        }
+
+        // --- 1. SYNC INPUTS ---
+        function syncInput(id, source) {
+            const slider = document.getElementById(`input-${id}`);
+            const num = document.getElementById(`input-${id}-num`);
+            if (source === 'slider') { num.value = slider.value; } else { slider.value = num.value; }
+            updateDCA(false);
+        }
+
+        // --- 2. REGRESSION SLIDER LOGIC ---
+        function toggleRegWindow() {
+            const isChecked = document.getElementById('check-reg-window').checked;
+            const container = document.getElementById('reg-window-container');
+            if(isChecked) {
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
+            updateDCA(false);
+        }
+
+        function updateRegressionUI() {
+            if(historyData.length === 0) return;
+            
+            const startIdx = parseInt(document.getElementById('input-reg-start').value);
+            const endIdx = parseInt(document.getElementById('input-reg-end').value);
+            
+            // Validate
+            if(startIdx > endIdx) {
+                document.getElementById('input-reg-start').value = endIdx;
+            }
+
+            // Display Dates
+            const validStart = parseInt(document.getElementById('input-reg-start').value);
+            const validEnd = parseInt(document.getElementById('input-reg-end').value);
+
+            const dStart = historyData[validStart]?.date.toLocaleDateString() || "-";
+            const dEnd = historyData[validEnd]?.date.toLocaleDateString() || "-";
+
+            document.getElementById('reg-start-date').innerText = dStart;
+            document.getElementById('reg-end-date').innerText = dEnd;
+
+            updateDCA(false); 
+        }
+
+        function initRegressionSliders() {
+            const maxIdx = Math.max(0, historyData.length - 1);
+            const sStart = document.getElementById('input-reg-start');
+            const sEnd = document.getElementById('input-reg-end');
+            
+            sStart.max = maxIdx; sStart.value = 0;
+            sEnd.max = maxIdx; sEnd.value = maxIdx;
+            
+            updateRegressionUI();
+        }
+
+        // --- 3. TIME SHIFT SLIDER LOGIC ---
+        function handleTimeShiftSlider() {
+            const shiftMonths = parseInt(document.getElementById('input-time-shift').value);
+            document.getElementById('val-time-shift').innerText = shiftMonths > 0 ? `+${shiftMonths}` : shiftMonths;
+            let baseDate = new Date();
+            if(historyData.length > 0) baseDate = new Date(historyData[historyData.length-1].date);
+            const newDate = new Date(baseDate);
+            newDate.setMonth(baseDate.getMonth() + shiftMonths);
+            document.getElementById('input-date-start').valueAsDate = newDate;
+            updateDCA(false);
+        }
+
+        function handleDateInput() {
+            const inputDate = document.getElementById('input-date-start').valueAsDate;
+            if(!inputDate) return;
+            let baseDate = new Date();
+            if(historyData.length > 0) baseDate = new Date(historyData[historyData.length-1].date);
+            const diffTime = inputDate - baseDate;
+            const diffMonths = Math.round(diffTime / (1000 * 60 * 60 * 24 * 30.44));
+            const slider = document.getElementById('input-time-shift');
+            if(diffMonths > slider.max) slider.max = diffMonths + 12;
+            if(diffMonths < slider.min) slider.min = diffMonths - 12;
+            slider.value = diffMonths;
+            document.getElementById('val-time-shift').innerText = diffMonths > 0 ? `+${diffMonths}` : diffMonths;
+            updateDCA(false);
+        }
+
+        // --- 4. FLUID SETTINGS ---
+        function updateFluidSettings() {
+            const radios = document.getElementsByName('fluidType');
+            for(const r of radios) { if(r.checked) fluidType = r.value; }
+            const qiSlider = document.getElementById('input-qi');
+            const elSlider = document.getElementById('input-el');
+            if (fluidType === 'oil') {
+                qiSlider.min = 10; qiSlider.max = 2000; qiSlider.step = 1; 
+                if(parseFloat(qiSlider.value) > 2000) qiSlider.value = 1000;
+                elSlider.max = 500; elSlider.step = 1;
+                updateUnitLabels('BOPD', 'MBO', 'Bbl');
+            } else {
+                qiSlider.min = 0.1; qiSlider.max = 100; qiSlider.step = 0.1;
+                if(parseFloat(qiSlider.value) > 100) qiSlider.value = 10;
+                elSlider.max = 5; elSlider.step = 0.01;
+                updateUnitLabels('MMscfd', 'Bscf', 'MMscf');
+            }
+            ['qi', 'di', 'b', 'months', 'el'].forEach(id => {
+                document.getElementById(`input-${id}-num`).value = document.getElementById(`input-${id}`).value;
+            });
+            updateDCA(false);
+        }
+
+        function updateUnitLabels(rate, volBig, volSmall) {
+            document.querySelectorAll('.unit-rate').forEach(el => el.innerText = rate);
+            document.querySelectorAll('.unit-vol').forEach(el => el.innerText = volBig);
+            document.querySelectorAll('.unit-vol-small').forEach(el => el.innerText = volSmall);
+            document.getElementById('unit-qi').innerText = rate;
+            document.getElementById('unit-el').innerText = rate;
+        }
+
+        // --- 5. DATA LOGIC ---
+        function loadExampleData() {
+            const data = [];
+            const start = new Date();
+            start.setMonth(start.getMonth() - 24);
+            let q = fluidType === 'oil' ? 1000 : 15; 
+            for(let i=0; i<24; i++) {
+                const d = new Date(start);
+                d.setMonth(start.getMonth() + i);
+                q = q * Math.exp(-0.02) * (0.95 + Math.random()*0.1); 
+                data.push({ date: d, q: q });
+            }
+            processRawData(data);
+        }
+
+        function processRawData(rawData) {
+            // REVERTED: No duplicate filtering
+            rawData.sort((a,b) => a.date - b.date);
+
+            if(rawData.length > 0) {
+                const startMs = rawData[0].date.getTime();
+                historyData = rawData.map(d => ({
+                    date: d.date,
+                    q: d.q,
+                    t_months: (d.date.getTime() - startMs) / (1000 * 60 * 60 * 24 * 30.44)
+                }));
+                const lastDate = rawData[rawData.length-1].date;
+                const nextDay = new Date(lastDate);
+                document.getElementById('input-date-start').valueAsDate = nextDay;
+                document.getElementById('input-time-shift').value = 0;
+                document.getElementById('val-time-shift').innerText = "0";
+                
+                initRegressionSliders(); 
+            } else {
+                historyData = [];
+                document.getElementById('input-date-start').valueAsDate = new Date();
+            }
+            updateDCA(false);
+        }
+
+        function handleHistoryPaste(text) {
+            if(!text) return;
+            const rows = text.trim().split(/\r?\n/);
+            const newData = [];
+            rows.forEach(row => {
+                const cols = row.trim().split(/[\t,]+/); 
+                if(cols.length >= 2) {
+                    const d = new Date(cols[0]);
+                    const q = parseFloat(cols[1]);
+                    if(!isNaN(d.getTime()) && !isNaN(q)) newData.push({date: d, q: q});
+                }
+            });
+            if(newData.length > 0) processRawData(newData);
+        }
+
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.trim().split(/\r?\n/);
+                const newData = [];
+                let startIdx = 0;
+                if(rows.length > 0 && isNaN(parseFloat(rows[0].split(/[\t,]+/)[1]))) startIdx = 1;
+                for(let i = startIdx; i < rows.length; i++) {
+                    const cols = rows[i].trim().split(/[\t,]+/);
+                    if(cols.length >= 2) {
+                        const d = new Date(cols[0]);
+                        const q = parseFloat(cols[1]);
+                        if(!isNaN(d.getTime()) && !isNaN(q)) newData.push({date: d, q: q});
+                    }
+                }
+                if(newData.length > 0) processRawData(newData);
+            };
+            reader.readAsText(file);
+        }
+
+        function clearHistory() {
+            historyData = [];
+            document.getElementById('historyPasteArea').value = '';
+            document.getElementById('input-date-start').valueAsDate = new Date();
+            updateDCA(false);
+        }
+
+        function setTableView(mode) {
+            tableView = mode;
+            const btns = { month: 'btn-month', day: 'btn-day', year: 'btn-year' };
+            const activeClass = "px-3 py-1 rounded bg-white shadow-sm font-semibold";
+            const inactiveClass = "px-3 py-1 rounded hover:bg-white hover:shadow-sm transition-all";
+            
+            Object.keys(btns).forEach(k => {
+                document.getElementById(btns[k]).className = (k === mode) ? activeClass : inactiveClass;
+            });
+            updateDCA(false);
+        }
+
+        // --- 6. CORE CALCULATION ---
+        function calculateDCA() {
+            const qi = parseFloat(document.getElementById('input-qi').value);
+            const Di_pct_yr = parseFloat(document.getElementById('input-di').value);
+            const b = parseFloat(document.getElementById('input-b').value);
+            const forecastMonthsSlider = parseFloat(document.getElementById('input-months').value);
+            const q_el = parseFloat(document.getElementById('input-el').value);
+            const startDateInput = document.getElementById('input-date-start').valueAsDate || new Date();
+            const Di_m = (Di_pct_yr / 100) / 12;
+
+            let histCum = 0;
+            const fitLine = [];
+            if (historyData.length > 0) {
+                for(let i=0; i<historyData.length; i++) {
+                     // CALCULATE ACTUAL DURATION BETWEEN DATA POINTS
+                     let days = 0;
+                     
+                     if (i < historyData.length - 1) {
+                         // Forward Difference
+                         days = (historyData[i+1].date - historyData[i].date) / (1000 * 60 * 60 * 24);
+                     } else {
+                         // Last Data Point: Use previous interval as estimate (or 1 day if single point)
+                         if (i > 0) {
+                             days = (historyData[i].date - historyData[i-1].date) / (1000 * 60 * 60 * 24);
+                         } else {
+                             days = 1; // Default for single data point (daily rate)
+                         }
+                     }
+                     // Ensure positive days (in case of sort error) and handle 0 diff
+                     if(days <= 0) days = 1; 
+
+                     const vol = historyData[i].q * days; 
+                     histCum += vol;
+
+                     const t = historyData[i].t_months;
+                     let q_model = 0;
+                     if(b === 0) q_model = qi * Math.exp(-Di_m * t);
+                     else q_model = qi / Math.pow((1 + b * Di_m * t), (1/b));
+                     fitLine.push({ t: t, q: q_model, date: historyData[i].date });
+                }
+            }
+
+            let t_offset = 0;
+            if(historyData.length > 0) {
+                const startHist = historyData[0].date;
+                const diffTime = startDateInput - startHist; 
+                const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44);
+                t_offset = diffMonths;
+            } else {
+                t_offset = 0; 
+            }
+
+            const forecastLine = []; 
+            const forecastTableData = []; 
+            let remReserves = 0;
+            let eolDate = "-";
+            
+            // CHART CALC
+            for(let m = 0; m <= forecastMonthsSlider; m++) {
+                const t = t_offset + m;
+                let q_calc = 0;
+                const t_safe = Math.max(0, t);
+                if(b === 0) q_calc = qi * Math.exp(-Di_m * t_safe);
+                else q_calc = qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
+                if(q_calc < q_el) q_calc = 0; 
+
+                const currentD = new Date(startDateInput);
+                currentD.setMonth(startDateInput.getMonth() + m);
+                forecastLine.push({ t: t, q: q_calc, date: currentD });
+            }
+
+            // TABLE CALC (Cumulative starts from 0 at forecast start)
+            let cumForecast = 0;
+            let m = 0;
+            let productionActive = true;
+            
+            if(tableView === 'year') {
+                // YEARLY AGGREGATION
+                let yearVol = 0;
+                let yearCount = 1;
+                let monthsInYear = 0;
+
+                while(productionActive && m < 1200) { // Max 100 years
+                    const t = t_offset + m;
+                    const t_safe = Math.max(0, t);
+                    let q = (b === 0) ? qi * Math.exp(-Di_m * t_safe) : qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
+
+                    if(q < q_el) {
+                        productionActive = false;
+                        q = 0;
+                        const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
+                    } else {
+                        const vol = q * 30.44; 
+                        yearVol += vol;
+                        remReserves += vol;
+                        cumForecast += vol;
+                        monthsInYear++;
+
+                        // Check end of year (every 12 months)
+                        if ((m + 1) % 12 === 0) {
+                            const avgRate = yearVol / 365.25; 
+                            forecastTableData.push({ 
+                                label: `Year ${yearCount}`, 
+                                q: avgRate, 
+                                vol: yearVol, 
+                                cum: cumForecast,
+                                isYearly: true
+                            });
+                            yearVol = 0;
+                            monthsInYear = 0;
+                            yearCount++;
+                        }
+                    }
+                    m++;
+                }
+                // Partial year at end
+                if(yearVol > 0) {
+                    const days = monthsInYear * 30.44;
+                    const avgRate = days > 0 ? yearVol / days : 0;
+                    forecastTableData.push({ 
+                        label: `Year ${yearCount}`, 
+                        q: avgRate, 
+                        vol: yearVol, 
+                        cum: cumForecast, 
+                        isYearly: true 
+                    });
+                }
+            } else if(tableView === 'month') {
+                while(productionActive && m < 1200) {
+                    const t = t_offset + m;
+                    const t_safe = Math.max(0, t);
+                    let q = (b === 0) ? qi * Math.exp(-Di_m * t_safe) : qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
+                    
+                    if(q < q_el) {
+                        productionActive = false; q = 0;
+                        const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
+                    } else {
+                        const vol = q * 30.44; remReserves += vol; cumForecast += vol;
+                        const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m);
+                        forecastTableData.push({ date: d, q: q, vol: vol, cum: cumForecast });
+                    }
+                    m++;
+                }
+            } else {
+                // DAILY
+                let d_count = 0;
+                while(productionActive && d_count < 3650) { 
+                     const t_days = (t_offset * 30.44) + d_count;
+                     const t_months_equiv = t_days / 30.44;
+                     const t_safe = Math.max(0, t_months_equiv);
+                     let q = (b === 0) ? qi * Math.exp(-Di_m * t_safe) : qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
+                     if(q < q_el) { 
+                         productionActive = false; q = 0;
+                         const d = new Date(startDateInput); d.setDate(startDateInput.getDate() + d_count); eolDate = d.toLocaleDateString();
+                     } else {
+                         const vol = q * 1; remReserves += vol; cumForecast += vol;
+                         const d = new Date(startDateInput); d.setDate(startDateInput.getDate() + d_count);
+                         forecastTableData.push({ date: d, q: q, vol: vol, cum: cumForecast });
+                     }
+                     d_count++;
+                }
+            }
+            if(eolDate === "-") eolDate = "> 100 Years";
+
+            return { fitLine, forecastLine, forecastTableData, histCum, remReserves, eolDate };
+        }
+
+        // --- 7. REGRESSION ---
+        async function runRegression() {
+            if(historyData.length < 3) { alert("Need at least 3 historical data points."); return; }
+            
+            const useWindow = document.getElementById('check-reg-window').checked;
+            let regressionData = [];
+            
+            if (useWindow) {
+                // Get Regression Window
+                const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
+                const regEndIdx = parseInt(document.getElementById('input-reg-end').value);
+                
+                if(regStartIdx >= regEndIdx) { alert("Invalid Regression Window. Start must be before End."); return; }
+
+                // Slice data for regression
+                regressionData = historyData.slice(regStartIdx, regEndIdx + 1);
+            } else {
+                // Use All Data
+                regressionData = historyData;
+            }
+
+            if(regressionData.length < 2) { alert("Not enough data points for regression."); return; }
+
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            await new Promise(r => setTimeout(r, 100));
+
+            let bestSSE = Infinity;
+            const qiMin = parseFloat(document.getElementById('input-qi').min);
+            const qiMax = parseFloat(document.getElementById('input-qi').max);
+            // UPDATED: bMax constraint
+            const bMax = 1.0; 
+            let bestParams = { qi: 1000, di: 20, b: 0.5 };
+            let currentParams = {
+                qi: parseFloat(document.getElementById('input-qi').value),
+                di: parseFloat(document.getElementById('input-di').value),
+                b: parseFloat(document.getElementById('input-b').value)
+            };
+            const iterations = 2000;
+            let temp = 100;
+            
+            for(let i=0; i<iterations; i++) {
+                const nextParams = {
+                    qi: currentParams.qi + (Math.random()-0.5) * temp * (fluidType==='gas'?5:10),
+                    di: currentParams.di + (Math.random()-0.5) * temp * 0.5,
+                    b: currentParams.b + (Math.random()-0.5) * temp * 0.05
+                };
+                nextParams.qi = Math.max(qiMin, Math.min(qiMax, nextParams.qi));
+                nextParams.di = Math.max(1, Math.min(300, nextParams.di));
+                nextParams.b = Math.max(0, Math.min(bMax, nextParams.b)); // Apply new bMax constraint
+
+                // PASS SLICED DATA TO SSE CALC
+                const error = calculateSSE(nextParams, regressionData);
+                if (error < bestSSE) {
+                    bestSSE = error; bestParams = {...nextParams}; currentParams = {...nextParams};
+                } else {
+                    if (Math.random() < Math.exp((bestSSE - error) / temp)) currentParams = {...nextParams};
+                }
+                temp *= 0.995;
+            }
+
+            document.getElementById('input-qi').value = bestParams.qi;
+            document.getElementById('input-di').value = bestParams.di;
+            document.getElementById('input-b').value = bestParams.b;
+            ['qi', 'di', 'b'].forEach(id => { document.getElementById(`input-${id}-num`).value = document.getElementById(`input-${id}`).value; });
+            updateDCA(false);
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function calculateSSE(p, dataSubset) {
+            let sse = 0;
+            const Di_m = (p.di / 100) / 12;
+            for(let i=0; i<dataSubset.length; i++) {
+                const t = dataSubset[i].t_months;
+                const actual = dataSubset[i].q;
+                let model = (Math.abs(p.b) < 0.001) ? p.qi * Math.exp(-Di_m * t) : p.qi / Math.pow((1 + p.b * Di_m * t), (1/p.b));
+                sse += Math.pow(actual - model, 2);
+            }
+            return sse;
+        }
+
+        // --- 8. COPY TABLE FUNCTION ---
+        function copyTable() {
+            if(!currentForecastData || currentForecastData.length === 0) return;
+            // Removed dynamic units from header as per request
+            let text = "Date/Year\tRate\tVolume\tCummulative\n";
+            currentForecastData.forEach(row => {
+                const dateStr = row.isYearly ? row.label : row.date.toISOString().split('T')[0];
+                text += `${dateStr}\t${row.q.toFixed(2)}\t${row.vol.toFixed(2)}\t${row.cum.toFixed(2)}\n`;
+            });
+
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                document.execCommand('copy');
+                const btn = document.getElementById('btn-copy');
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied';
+                setTimeout(() => btn.innerHTML = originalHtml, 2000);
+            } catch (err) { alert("Failed to copy table."); }
+            document.body.removeChild(ta);
+        }
+
+        // --- UI UPDATER ---
+        function updateDCA(isRegression = false) {
+            const res = calculateDCA();
+            currentForecastData = res.forecastTableData; 
+            const volDiv = fluidType === 'gas' ? 1000 : 1000;
+            
+            document.getElementById('res-eur').innerText = ((res.histCum + res.remReserves)/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
+            document.getElementById('res-rem').innerText = (res.remReserves/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
+            document.getElementById('res-cum').innerText = (res.histCum/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
+            document.getElementById('res-eol').innerText = res.eolDate;
+
+            const tbody = document.getElementById('forecastTableBody');
+            tbody.innerHTML = '';
+            const renderLimit = 200;
+            res.forecastTableData.slice(0, renderLimit).forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b hover:bg-gray-50";
+                
+                // Display Date or Year Label
+                const displayDate = row.isYearly ? row.label : row.date.toLocaleDateString();
+
+                tr.innerHTML = `
+                    <td class="p-2 text-gray-600">${displayDate}</td>
+                    <td class="p-2 font-mono font-bold text-red-500">${fluidType==='gas' ? row.q.toFixed(2) : Math.round(row.q)}</td>
+                    <td class="p-2 text-gray-600">${Math.round(row.vol).toLocaleString()}</td>
+                    <td class="p-2 font-semibold text-gray-800">${(row.cum/1000).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            if(res.forecastTableData.length > renderLimit) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="4" class="p-2 text-center text-gray-500 italic">... showing first ${renderLimit} rows (Download CSV for full dataset) ...</td>`;
+                tbody.appendChild(tr);
+            }
+
+            const isLog = document.getElementById('logScaleToggle').checked;
+            const traceHist = {
+                x: historyData.map(d => d.date), y: historyData.map(d => d.q),
+                mode: 'markers', type: 'scatter', name: 'History',
+                marker: { color: '#333', size: 5, symbol: 'circle' }
+            };
+            const traceFit = {
+                x: res.fitLine.map(d => d.date), y: res.fitLine.map(d => d.q),
+                mode: 'lines', type: 'scatter', name: 'Hist. Fit',
+                line: { color: '#0083B8', width: 2, dash: 'dash' }
+            };
+            const fcstX = [], fcstY = [];
+            res.forecastLine.forEach(pt => { if(pt.q > 0) { fcstX.push(pt.date); fcstY.push(pt.q); }});
+            const traceFcst = {
+                x: fcstX, y: fcstY,
+                mode: 'lines', type: 'scatter', name: 'Forecast',
+                line: { color: '#ff4b4b', width: 3 }
+            };
+
+            const q_el = parseFloat(document.getElementById('input-el').value);
+            let limitX = [];
+            if(historyData.length > 0) limitX.push(historyData[0].date);
+            else if(fcstX.length > 0) limitX.push(fcstX[0]);
+            const lastFcst = fcstX.length > 0 ? fcstX[fcstX.length-1] : new Date();
+            limitX.push(lastFcst);
+            const traceLimit = {
+                x: limitX, y: [q_el, q_el],
+                mode: 'lines', name: 'Eco. Limit',
+                line: { color: 'orange', dash: 'dot', width: 1 }
+            };
+
+            // Selected Regression Window Indicator
+            const useWindow = document.getElementById('check-reg-window').checked;
+            let shapes = [];
+            
+            if (useWindow) {
+                const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
+                const regEndIdx = parseInt(document.getElementById('input-reg-end').value);
+                
+                if(historyData.length > 0 && regStartIdx >= 0 && regEndIdx < historyData.length) {
+                    const startD = historyData[regStartIdx].date;
+                    const endD = historyData[regEndIdx].date;
+                    
+                    shapes.push({
+                        type: 'rect', 
+                        xref: 'x', 
+                        yref: 'paper', // Use full height
+                        x0: startD, 
+                        x1: endD, 
+                        y0: 0, 
+                        y1: 1, 
+                        fillcolor: 'rgba(0, 131, 184, 0.1)', // Original Opacity
+                        line: { width: 0 }
+                    });
+                }
+            }
+
+            const layout = {
+                title: 'Production Rate vs Date',
+                font: { family: '"Source Sans Pro", sans-serif' },
+                xaxis: { title: 'Date' },
+                yaxis: { title: `Rate (${fluidType === 'gas' ? 'MMscfd' : 'BOPD'})`, type: isLog ? 'log' : 'linear' },
+                paper_bgcolor: 'white', plot_bgcolor: 'white',
+                margin: { t: 40, r: 20, l: 60, b: 40 }, legend: { x: 1, xanchor: 'right', y: 1 },
+                shapes: shapes
+            };
+
+            Plotly.react('dcaChart', [traceHist, traceFit, traceFcst, traceLimit], layout, {displayModeBar: false});
+        }
+
+        function downloadCSV() {
+            if(!currentForecastData || currentForecastData.length === 0) return;
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Date/Year,Rate,Volume,Cummulative\n";
+            currentForecastData.forEach(row => {
+                const dateStr = row.isYearly ? row.label : row.date.toISOString().split('T')[0];
+                const rowStr = `${dateStr},${row.q.toFixed(2)},${row.vol.toFixed(2)},${row.cum.toFixed(2)}`;
+                csvContent += rowStr + "\n";
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `dca_forecast_${tableView}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+        updateFluidSettings(); 
+        loadExampleData(); 
+        window.onresize = () => Plotly.Plots.resize('dcaChart');
+
+    </script>
+</body>
+</html>
