@@ -32,7 +32,7 @@
 
         /* Sidebar */
         #sidebar {
-            width: 450px; /* UPDATED: Diperlebar dari 380px ke 450px */
+            width: 450px; 
             background-color: var(--sidebar-bg);
             padding: 2rem 1.5rem;
             overflow-y: auto;
@@ -46,7 +46,7 @@
                 position: absolute;
                 z-index: 50;
                 height: 100%;
-                margin-left: -450px; /* UPDATED: Disesuaikan dengan width baru agar hidden sempurna */
+                margin-left: -450px;
             }
             #sidebar.open {
                 margin-left: 0;
@@ -154,14 +154,31 @@
         
         <h2 style="font-size: 1.5rem; margin-top: 0; margin-bottom: 1rem;">Decline Curve Parameters</h2>
         
+        <!-- WELL INFO SECTION (NEW) -->
+        <div class="mb-5 p-3 bg-white rounded border border-gray-200 shadow-sm">
+            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Well Information</label>
+            <div class="grid grid-cols-1 gap-3">
+                <div>
+                    <label class="text-xs text-gray-600 block mb-1 font-semibold">Well Name</label>
+                    <input type="text" id="input-well-name" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-gray-800 focus:border-red-500 focus:outline-none" value="" onchange="updateProjectInfo()">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-600 block mb-1 font-semibold">Zone</label>
+                    <input type="text" id="input-zone-name" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-gray-800 focus:border-red-500 focus:outline-none" value="" onchange="updateProjectInfo()">
+                </div>
+            </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1rem 0;">
+
         <!-- FLUID TYPE -->
         <label class="slider-label">Fluid Type</label>
         <div class="st-radio-group">
             <label class="st-radio-option">
-                <input type="radio" name="fluidType" value="oil" checked onchange="updateFluidSettings()"> Oil
+                <input type="radio" name="fluidType" value="oil" checked onchange="handleFluidChange()"> Oil
             </label>
             <label class="st-radio-option">
-                <input type="radio" name="fluidType" value="gas" onchange="updateFluidSettings()"> Gas
+                <input type="radio" name="fluidType" value="gas" onchange="handleFluidChange()"> Gas
             </label>
         </div>
 
@@ -189,7 +206,6 @@
                 <span class="slider-label">Hyperbolic Exponent, b</span>
                 <input type="number" id="input-b-num" class="val-input" step="0.05" onchange="syncInput('b', 'num')">
             </div>
-            <!-- UPDATED: Max value set to 1.0 -->
             <input type="range" id="input-b" min="0" max="1.0" step="0.05" value="0.5" oninput="syncInput('b', 'slider')">
             <div class="text-[10px] text-gray-400 mt-1 italic">Note: If b=0, it is Exponential</div>
         </div>
@@ -254,6 +270,21 @@
 
         <!-- HISTORICAL DATA SOURCE -->
         <label class="slider-label" style="display:block; margin-bottom:0.5rem;">Historical Data Source</label>
+        
+        <!-- GAS UNIT OPTION (MOVED HERE) -->
+        <div id="gasUnitContainer" style="display:none; margin-bottom: 1rem; padding: 0.5rem; background-color: #e6f3ff; border-radius: 4px; border: 1px solid #bce0fd;">
+            <label class="slider-label" style="font-size:12px; color:var(--secondary-color);">Gas Data Input Unit</label>
+            <div class="st-radio-group" style="margin-bottom: 0.25rem; margin-top: 0.25rem;">
+                <label class="st-radio-option" style="font-size: 12px;">
+                    <input type="radio" name="gasUnit" value="mscfd" onchange="handleGasUnitChange()"> Mscfd
+                </label>
+                <label class="st-radio-option" style="font-size: 12px;">
+                    <input type="radio" name="gasUnit" value="mmscfd" checked onchange="handleGasUnitChange()"> MMscfd
+                </label>
+            </div>
+            <div class="text-[10px] text-gray-500 italic">Selection will auto-convert value to MMscfd for plot.</div>
+        </div>
+
         <div class="flex gap-2 mb-4 text-xs">
             <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('example')">Example</button>
             <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('upload')">Upload</button>
@@ -262,20 +293,26 @@
 
         <!-- TAB: EXAMPLE -->
         <div id="tab-example" class="input-tab bg-blue-50 p-3 rounded border border-blue-100 mb-4">
-            <div class="text-xs text-blue-800 mb-2">Use built-in example data.</div>
+            <div class="text-xs text-blue-800 mb-2">Use built-in example data based on Fluid Type.</div>
             <button class="st-button primary" onclick="loadExampleData()" style="margin:0; font-size:12px;">Load Example Data</button>
         </div>
 
         <!-- TAB: UPLOAD -->
         <div id="tab-upload" class="input-tab bg-white p-3 rounded border mb-4">
-             <div class="text-xs text-gray-500 mb-2"><b>CSV File</b> (Col 1: Date, Col 2: Rate)</div>
+             <div class="text-xs text-gray-500 mb-2"><b>CSV File</b></div>
+             <div class="text-[10px] text-gray-400 mb-2">
+                 Format: <b>Date, FTHP (psi), <span id="label-upload-rate">Oil Rate (BOPD)</span></b>
+             </div>
              <input type="file" id="csvFile" accept=".csv" onchange="handleFileUpload(this)" style="font-size: 11px; width: 100%;">
         </div>
 
         <!-- TAB: PASTE -->
         <div id="tab-paste" class="input-tab bg-white p-3 rounded border mb-4">
-            <div class="text-xs text-gray-500 mb-2">Format: <code>YYYY-MM-DD [tab] Rate</code></div>
-            <textarea id="historyPasteArea" class="st-textarea" placeholder="2023-01-01	1500..." oninput="handleHistoryPaste(this.value)"></textarea>
+            <div class="text-xs text-gray-500 mb-2" id="hint-paste-format">
+                Format: <code>Date [tab] FTHP (psi) [tab] Rate (BOPD)</code>
+            </div>
+            <div class="text-[10px] text-gray-400 mb-1">Supports <code>DD/MM/YYYY</code> or <code>YYYY-MM-DD</code></div>
+            <textarea id="historyPasteArea" class="st-textarea" placeholder="01/01/2023	400	1000..." oninput="handleHistoryPaste(this.value)"></textarea>
             <button class="st-button" onclick="clearHistory()" style="margin-top:5px; font-size:12px;">Clear Data</button>
         </div>
 
@@ -291,7 +328,6 @@
                 <button class="st-button" onclick="document.getElementById('projectFileInput').click()" style="margin:0; font-size:12px;">
                     <i class="fas fa-folder-open mr-1"></i> Load File
                 </button>
-                <!-- Allow both json and csv -->
                 <input type="file" id="projectFileInput" accept=".json,.csv,.txt" onchange="loadProject(this)">
             </div>
             <div class="text-[10px] text-gray-400 mt-1">Supports editable CSV format.</div>
@@ -303,9 +339,16 @@
     <div id="main-container">
         <h1 class="text-2xl font-bold mb-4">Decline Curve Analysis (DCA)</h1>
         
-        <div class="flex items-center gap-2 mb-4">
-            <input type="checkbox" id="logScaleToggle" onchange="updateDCA(false)" class="w-4 h-4 text-red-600 rounded">
-            <label for="logScaleToggle" class="text-sm font-medium">Logarithmic Scale (Semi-Log)</label>
+        <!-- CONTROL BAR (Log Scale + FTHP Toggle) -->
+        <div class="flex items-center gap-4 mb-4">
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="logScaleToggle" onchange="updateDCA(false)" class="w-4 h-4 text-red-600 rounded">
+                <label for="logScaleToggle" class="text-sm font-medium">Logarithmic Scale</label>
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="showFTHPToggle" onchange="updateDCA(false)" class="w-4 h-4 text-green-600 rounded">
+                <label for="showFTHPToggle" class="text-sm font-medium">Show FTHP (Pressure)</label>
+            </div>
         </div>
 
         <!-- Plotly Chart -->
@@ -377,9 +420,12 @@
     <script>
         // --- GLOBAL STATE ---
         let fluidType = 'oil'; 
-        let historyData = []; 
+        let historyData = []; // { date, fthp, q (in stored unit) }
         let tableView = 'month';
         let currentForecastData = []; 
+        let gasInputUnit = 'mmscfd'; // 'mscfd' or 'mmscfd'
+        let wellName = '';
+        let zoneName = '';
 
         // Init Input Tabs
         function switchInputTab(tabName) {
@@ -391,10 +437,11 @@
         // --- 0. PROJECT MANAGEMENT (CSV / JSON) ---
         
         function saveProjectCSV() {
-            // Create a human readable CSV format
-            
             let csv = "[PARAMETERS]\nParameter,Value\n";
+            csv += `wellName,${wellName}\n`;
+            csv += `zoneName,${zoneName}\n`;
             csv += `fluidType,${fluidType}\n`;
+            csv += `gasInputUnit,${gasInputUnit}\n`;
             csv += `qi,${document.getElementById('input-qi').value}\n`;
             csv += `di,${document.getElementById('input-di').value}\n`;
             csv += `b,${document.getElementById('input-b').value}\n`;
@@ -406,11 +453,15 @@
             csv += `regStart,${document.getElementById('input-reg-start').value}\n`;
             csv += `regEnd,${document.getElementById('input-reg-end').value}\n`;
             csv += `logScale,${document.getElementById('logScaleToggle').checked}\n`;
+            csv += `showFTHP,${document.getElementById('showFTHPToggle').checked}\n`;
             
-            csv += "\n[HISTORY]\nDate,Rate\n";
+            // Just store whatever is current historyData
+            // Column names adapt to fluidType just for labeling
+            const rateLabel = fluidType === 'gas' ? 'GasRate' : 'OilRate';
+            csv += `\n[HISTORY]\nDate,FTHP,${rateLabel}\n`;
             historyData.forEach(d => {
                 const dateStr = d.date.toISOString().split('T')[0];
-                csv += `${dateStr},${d.q}\n`;
+                csv += `${dateStr},${d.fthp || 0},${d.q}\n`;
             });
 
             const dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
@@ -429,14 +480,12 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 const content = e.target.result;
-                
-                // Detect if JSON or CSV
                 if(content.trim().startsWith("{")) {
-                    loadJSONProject(content);
+                    loadJSONProject(content); // Legacy JSON support (simplified)
                 } else if(content.includes("[PARAMETERS]")) {
                     loadCSVProject(content);
                 } else {
-                    alert("Unknown file format. Please load a valid .json or .csv project file.");
+                    alert("Unknown file format.");
                 }
             };
             reader.readAsText(file);
@@ -455,12 +504,13 @@
                     if(!cleanLine) return;
                     
                     if(cleanLine === "[PARAMETERS]") { section = "PARAMS"; return; }
-                    if(cleanLine === "[HISTORY]") { section = "HISTORY"; return; }
+                    if(cleanLine === "[HISTORY]") { section = "HISTORY"; return; } // Old format
+                    if(cleanLine === "[HISTORY_RAW]") { section = "HISTORY"; return; } // Transition format
+                    if(cleanLine.startsWith("[HISTORY]")) { section = "HISTORY"; return; } // Generic match
                     
                     if(section === "PARAMS") {
                         const parts = cleanLine.split(",");
                         if(parts.length >= 2 && parts[0] !== "Parameter") {
-                            // Simple Key Value
                             let val = parts[1];
                             if(val === "true") val = true;
                             if(val === "false") val = false;
@@ -469,29 +519,40 @@
                     } else if(section === "HISTORY") {
                         const parts = cleanLine.split(",");
                         if(parts.length >= 2 && parts[0] !== "Date") {
-                            const d = new Date(parts[0]);
-                            const q = parseFloat(parts[1]);
-                            if(!isNaN(d.getTime()) && !isNaN(q)) {
-                                newHistory.push({date: d, q: q});
+                            // Try to detect column count
+                            // Format requested: Date, FTHP, Rate
+                            // But backward compatibility needed
+                            const d = parseDate(parts[0]);
+                            if(d && !isNaN(d.getTime())) {
+                                // Default assignment if 3 cols: Date, FTHP, Rate
+                                // If 2 cols: Date, Rate (assume FTHP=0)
+                                let fthp = 0;
+                                let rate = 0;
+                                
+                                if(parts.length === 2) {
+                                    rate = parseFloat(parts[1]);
+                                } else if (parts.length >= 3) {
+                                    fthp = parseFloat(parts[1]);
+                                    rate = parseFloat(parts[2]);
+                                }
+                                
+                                if(!isNaN(rate)) {
+                                    newHistory.push({ date: d, fthp: fthp || 0, q: rate });
+                                }
                             }
                         }
                     }
                 });
 
                 applyLoadedData(params, newHistory);
-                alert("CSV Project loaded successfully!");
+                alert("Project loaded successfully!");
 
-            } catch (err) {
-                console.error(err);
-                alert("Error parsing CSV project file.");
-            }
+            } catch (err) { console.error(err); alert("Error parsing CSV project file."); }
         }
 
         function loadJSONProject(jsonText) {
-            try {
+             try {
                 const state = JSON.parse(jsonText);
-                
-                // Convert JSON structure to flat params for common applier
                 const params = {
                     fluidType: state.fluidType,
                     qi: state.params.qi,
@@ -500,49 +561,40 @@
                     months: state.params.months,
                     el: state.params.el,
                     dateStart: state.params.dateStart,
-                    timeShift: state.params.timeShift,
-                    regEnabled: state.regression ? state.regression.enabled : false,
-                    regStart: state.regression ? state.regression.start : 0,
-                    regEnd: state.regression ? state.regression.end : 10,
-                    logScale: state.logScale
+                    timeShift: state.params.timeShift
                 };
-
-                const newHistory = (state.historyData || []).map(d => ({ date: new Date(d.date), q: d.q }));
-                
+                // Fallback map
+                const newHistory = (state.historyData || []).map(d => ({ 
+                    date: new Date(d.date), 
+                    q: d.q,
+                    fthp: d.fthp || 0
+                }));
                 applyLoadedData(params, newHistory);
-                alert("JSON Project loaded successfully!");
-
-            } catch(err) {
-                console.error(err);
-                alert("Error parsing JSON project file.");
-            }
+            } catch(e) { alert("Error loading JSON"); }
         }
 
         function applyLoadedData(params, newHistory) {
-            // 1. Fluid
             fluidType = params.fluidType || 'oil';
-            const radios = document.getElementsByName('fluidType');
-            for(const r of radios) { 
-                if(r.value === fluidType) r.checked = true; 
-            }
-            updateFluidSettings();
+            gasInputUnit = params.gasInputUnit || 'mmscfd';
+            wellName = params.wellName || '';
+            // Handle legacy "layerName" or new "zoneName"
+            zoneName = params.zoneName || params.layerName || '';
+            
+            // Set UI for well/zone
+            document.getElementById('input-well-name').value = wellName;
+            document.getElementById('input-zone-name').value = zoneName;
 
-            // 2. History
-            if(newHistory.length > 0) {
-                // Re-process to add t_months etc
-                const sorted = newHistory.sort((a,b) => a.date - b.date);
-                const startMs = sorted[0].date.getTime();
-                historyData = sorted.map(d => ({
-                    date: d.date,
-                    q: d.q,
-                    t_months: (d.date.getTime() - startMs) / (1000 * 60 * 60 * 24 * 30.44)
-                }));
-                initRegressionSliders(); 
-            } else {
-                historyData = [];
-            }
+            // Set Radios
+            const fRadios = document.getElementsByName('fluidType');
+            for(const r of fRadios) { if(r.value === fluidType) r.checked = true; }
+            const gRadios = document.getElementsByName('gasUnit');
+            for(const r of gRadios) { if(r.value === gasInputUnit) r.checked = true; }
 
-            // 3. Parameters
+            // Set Data
+            const sorted = newHistory.sort((a,b) => a.date - b.date);
+            processHistoryData(sorted);
+
+            // Params
             if(params.qi) document.getElementById('input-qi').value = params.qi;
             if(params.di) document.getElementById('input-di').value = params.di;
             if(params.b) document.getElementById('input-b').value = params.b;
@@ -559,22 +611,206 @@
                 document.getElementById('val-time-shift').innerText = (parseInt(params.timeShift) > 0 ? "+" : "") + params.timeShift;
             }
 
-            // 4. Regression UI
-            document.getElementById('check-reg-window').checked = (String(params.regEnabled) === "true");
-            toggleRegWindow();
-            if(params.regStart) document.getElementById('input-reg-start').value = params.regStart;
-            if(params.regEnd) document.getElementById('input-reg-end').value = params.regEnd;
-            updateRegressionUI();
-
-            // 5. Log Scale
-            if(params.logScale !== undefined) {
-                document.getElementById('logScaleToggle').checked = (String(params.logScale) === "true");
+            // Restore FTHP Toggle
+            if(params.showFTHP !== undefined) {
+                document.getElementById('showFTHPToggle').checked = (String(params.showFTHP) === "true");
             }
 
+            updateFluidSettings();
             updateDCA(false);
         }
 
-        // --- 1. SYNC INPUTS ---
+        // --- HANDLERS ---
+        function updateProjectInfo() {
+            wellName = document.getElementById('input-well-name').value;
+            zoneName = document.getElementById('input-zone-name').value;
+            updateDCA(false);
+        }
+
+        function handleFluidChange() {
+            const radios = document.getElementsByName('fluidType');
+            for(const r of radios) { if(r.checked) fluidType = r.value; }
+            updateFluidSettings();
+            updateDCA(false);
+        }
+
+        function handleGasUnitChange() {
+            const radios = document.getElementsByName('gasUnit');
+            for(const r of radios) { if(r.checked) gasInputUnit = r.value; }
+            updateFluidSettings();
+            updateDCA(false);
+        }
+
+        function processHistoryData(data) {
+             if(data.length === 0) {
+                historyData = [];
+                return;
+            }
+            
+            // Calculate t_months
+            const startMs = data[0].date.getTime();
+            historyData = data.map(d => ({
+                date: d.date,
+                fthp: d.fthp,
+                q: d.q,
+                t_months: (d.date.getTime() - startMs) / (1000 * 60 * 60 * 24 * 30.44)
+            }));
+            
+            initRegressionSliders();
+        }
+
+        // --- PARSING ---
+        function parseDate(dateStr) {
+            if(!dateStr) return null;
+            // Handle DD/MM/YYYY
+            if(dateStr.includes('/')) {
+                const parts = dateStr.split('/');
+                if(parts.length === 3) {
+                    if(parts[2].length === 4) {
+                        return new Date(parts[2], parts[1]-1, parts[0]);
+                    }
+                }
+            }
+            // Fallback
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        function parseRawLine(line) {
+            // New Requirement: Date, FTHP, Rate
+            const cols = line.trim().split(/[\t,]+/);
+            if(cols.length < 2) return null;
+
+            const d = parseDate(cols[0]);
+            if(!d || isNaN(d.getTime())) return null;
+
+            // Col 1 is FTHP
+            const fthp = parseFloat(cols[1]);
+            
+            // Col 2 is Rate
+            // If only 2 cols, maybe user pasted Date, Rate?
+            // User explicit request: "date, fthp, rate"
+            // Let's support graceful degradation. If 2 cols found, assume Date, Rate?
+            // Or strictly follow instruction?
+            // "urutannya menjadi date, fthp, oil rate" implies 3 cols.
+            // But if user pastes just 2, we might miss Rate.
+            // Let's try: if 3 cols -> Date, FTHP, Rate. If 2 cols -> Date, Rate (FTHP=0).
+            
+            let rate = 0;
+            let finalFthp = 0;
+
+            if(cols.length >= 3) {
+                finalFthp = isNaN(fthp) ? 0 : fthp;
+                rate = parseFloat(cols[2]);
+            } else if (cols.length === 2) {
+                // Ambiguous. Assuming Date, Rate for compatibility with simple lists
+                rate = parseFloat(cols[1]);
+            }
+
+            if(isNaN(rate)) return null;
+
+            return {
+                date: d,
+                fthp: finalFthp,
+                q: rate
+            };
+        }
+
+        // --- DATA INPUT ---
+        function loadExampleData() {
+            const data = [];
+            const start = new Date();
+            start.setMonth(start.getMonth() - 24);
+            let q = fluidType === 'oil' ? 1000 : 5000; 
+            let fthp = 400;
+
+            // If gas, let's say 5000 mscfd or 5 mmscfd
+            // Let's use 5.0 and set unit to mmscfd
+            if(fluidType === 'gas') {
+                q = 5.0;
+                document.querySelector('input[name="gasUnit"][value="mmscfd"]').checked = true;
+                gasInputUnit = 'mmscfd';
+            }
+
+            for(let i=0; i<24; i++) {
+                const d = new Date(start);
+                d.setMonth(start.getMonth() + i);
+                
+                // decline
+                q = q * Math.exp(-0.02) * (0.95 + Math.random()*0.1);
+                fthp = fthp * 0.98;
+
+                data.push({
+                    date: d,
+                    fthp: Math.round(fthp),
+                    q: q
+                });
+            }
+            
+            const sorted = data.sort((a,b) => a.date - b.date);
+            processHistoryData(sorted);
+            
+            // Set Date Start
+            if(historyData.length > 0) {
+                const lastDate = historyData[historyData.length-1].date;
+                const nextDay = new Date(lastDate);
+                document.getElementById('input-date-start').valueAsDate = nextDay;
+                document.getElementById('input-time-shift').value = 0;
+            }
+            updateDCA(false);
+        }
+
+        function handleHistoryPaste(text) {
+            if(!text) return;
+            const rows = text.trim().split(/\r?\n/);
+            const newData = [];
+            rows.forEach(row => {
+                const item = parseRawLine(row);
+                if(item) newData.push(item);
+            });
+            if(newData.length > 0) {
+                const sorted = newData.sort((a,b) => a.date - b.date);
+                processHistoryData(sorted);
+                const lastDate = historyData[historyData.length-1].date;
+                document.getElementById('input-date-start').valueAsDate = new Date(lastDate);
+                updateDCA(false);
+            }
+        }
+
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const rows = text.trim().split(/\r?\n/);
+                const newData = [];
+                // Skip header if non-numeric
+                let startIdx = 0;
+                if(rows.length > 0 && isNaN(parseFloat(rows[0].split(/[\t,]+/)[1]))) startIdx = 1;
+                
+                for(let i = startIdx; i < rows.length; i++) {
+                    const item = parseRawLine(rows[i]);
+                    if(item) newData.push(item);
+                }
+                
+                if(newData.length > 0) {
+                    const sorted = newData.sort((a,b) => a.date - b.date);
+                    processHistoryData(sorted);
+                    updateDCA(false);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearHistory() {
+            historyData = [];
+            document.getElementById('historyPasteArea').value = '';
+            updateDCA(false);
+        }
+
+        // --- UI SYNC ---
+
         function syncInput(id, source) {
             const slider = document.getElementById(`input-${id}`);
             const num = document.getElementById(`input-${id}-num`);
@@ -582,39 +818,23 @@
             updateDCA(false);
         }
 
-        // --- 2. REGRESSION SLIDER LOGIC ---
         function toggleRegWindow() {
             const isChecked = document.getElementById('check-reg-window').checked;
-            const container = document.getElementById('reg-window-container');
-            if(isChecked) {
-                container.style.display = 'block';
-            } else {
-                container.style.display = 'none';
-            }
+            document.getElementById('reg-window-container').style.display = isChecked ? 'block' : 'none';
             updateDCA(false);
         }
 
         function updateRegressionUI() {
             if(historyData.length === 0) return;
-            
             const startIdx = parseInt(document.getElementById('input-reg-start').value);
             const endIdx = parseInt(document.getElementById('input-reg-end').value);
+            if(startIdx > endIdx) document.getElementById('input-reg-start').value = endIdx;
             
-            // Validate
-            if(startIdx > endIdx) {
-                document.getElementById('input-reg-start').value = endIdx;
-            }
-
-            // Display Dates
             const validStart = parseInt(document.getElementById('input-reg-start').value);
             const validEnd = parseInt(document.getElementById('input-reg-end').value);
-
-            const dStart = historyData[validStart]?.date.toLocaleDateString() || "-";
-            const dEnd = historyData[validEnd]?.date.toLocaleDateString() || "-";
-
-            document.getElementById('reg-start-date').innerText = dStart;
-            document.getElementById('reg-end-date').innerText = dEnd;
-
+            
+            document.getElementById('reg-start-date').innerText = historyData[validStart]?.date.toLocaleDateString() || "-";
+            document.getElementById('reg-end-date').innerText = historyData[validEnd]?.date.toLocaleDateString() || "-";
             updateDCA(false); 
         }
 
@@ -622,14 +842,11 @@
             const maxIdx = Math.max(0, historyData.length - 1);
             const sStart = document.getElementById('input-reg-start');
             const sEnd = document.getElementById('input-reg-end');
-            
             sStart.max = maxIdx; sStart.value = 0;
             sEnd.max = maxIdx; sEnd.value = maxIdx;
-            
             updateRegressionUI();
         }
 
-        // --- 3. TIME SHIFT SLIDER LOGIC ---
         function handleTimeShiftSlider() {
             const shiftMonths = parseInt(document.getElementById('input-time-shift').value);
             document.getElementById('val-time-shift').innerText = shiftMonths > 0 ? `+${shiftMonths}` : shiftMonths;
@@ -656,27 +873,42 @@
             updateDCA(false);
         }
 
-        // --- 4. FLUID SETTINGS ---
         function updateFluidSettings() {
-            const radios = document.getElementsByName('fluidType');
-            for(const r of radios) { if(r.checked) fluidType = r.value; }
             const qiSlider = document.getElementById('input-qi');
             const elSlider = document.getElementById('input-el');
+            const gasContainer = document.getElementById('gasUnitContainer');
+            const uploadLabel = document.getElementById('label-upload-rate');
+            const pasteLabel = document.getElementById('hint-paste-format');
+            
+            // Get current gas unit from DOM if updated
+            const currentGasUnit = document.querySelector('input[name="gasUnit"]:checked')?.value || 'mmscfd';
+            let rateUnit = 'BOPD';
+            if(fluidType === 'gas') {
+                rateUnit = (currentGasUnit === 'mscfd') ? 'Mscfd' : 'MMscfd';
+            }
+
             if (fluidType === 'oil') {
-                qiSlider.min = 10; qiSlider.max = 2000; qiSlider.step = 1; 
-                if(parseFloat(qiSlider.value) > 2000) qiSlider.value = 1000;
+                qiSlider.min = 10; qiSlider.max = 5000; qiSlider.step = 1; 
+                if(parseFloat(qiSlider.value) > 5000) qiSlider.value = 1000;
                 elSlider.max = 500; elSlider.step = 1;
                 updateUnitLabels('BOPD', 'MBO', 'Bbl');
+                
+                gasContainer.style.display = 'none';
+                uploadLabel.innerText = "Oil Rate (BOPD)";
+                if(pasteLabel) pasteLabel.innerHTML = 'Format: <code>Date [tab] FTHP (psi) [tab] Rate (BOPD)</code>';
             } else {
                 qiSlider.min = 0.1; qiSlider.max = 100; qiSlider.step = 0.1;
                 if(parseFloat(qiSlider.value) > 100) qiSlider.value = 10;
-                elSlider.max = 5; elSlider.step = 0.01;
+                elSlider.max = 10; elSlider.step = 0.01;
                 updateUnitLabels('MMscfd', 'Bscf', 'MMscf');
+                
+                gasContainer.style.display = 'block';
+                uploadLabel.innerText = `Gas Rate (${rateUnit})`;
+                if(pasteLabel) pasteLabel.innerHTML = `Format: <code>Date [tab] FTHP (psi) [tab] Rate (${rateUnit})</code>`;
             }
             ['qi', 'di', 'b', 'months', 'el'].forEach(id => {
                 document.getElementById(`input-${id}-num`).value = document.getElementById(`input-${id}`).value;
             });
-            updateDCA(false);
         }
 
         function updateUnitLabels(rate, volBig, volSmall) {
@@ -687,104 +919,18 @@
             document.getElementById('unit-el').innerText = rate;
         }
 
-        // --- 5. DATA LOGIC ---
-        function loadExampleData() {
-            const data = [];
-            const start = new Date();
-            start.setMonth(start.getMonth() - 24);
-            let q = fluidType === 'oil' ? 1000 : 15; 
-            for(let i=0; i<24; i++) {
-                const d = new Date(start);
-                d.setMonth(start.getMonth() + i);
-                q = q * Math.exp(-0.02) * (0.95 + Math.random()*0.1); 
-                data.push({ date: d, q: q });
-            }
-            processRawData(data);
-        }
-
-        function processRawData(rawData) {
-            // REVERTED: No duplicate filtering
-            rawData.sort((a,b) => a.date - b.date);
-
-            if(rawData.length > 0) {
-                const startMs = rawData[0].date.getTime();
-                historyData = rawData.map(d => ({
-                    date: d.date,
-                    q: d.q,
-                    t_months: (d.date.getTime() - startMs) / (1000 * 60 * 60 * 24 * 30.44)
-                }));
-                const lastDate = rawData[rawData.length-1].date;
-                const nextDay = new Date(lastDate);
-                document.getElementById('input-date-start').valueAsDate = nextDay;
-                document.getElementById('input-time-shift').value = 0;
-                document.getElementById('val-time-shift').innerText = "0";
-                
-                initRegressionSliders(); 
-            } else {
-                historyData = [];
-                document.getElementById('input-date-start').valueAsDate = new Date();
-            }
-            updateDCA(false);
-        }
-
-        function handleHistoryPaste(text) {
-            if(!text) return;
-            const rows = text.trim().split(/\r?\n/);
-            const newData = [];
-            rows.forEach(row => {
-                const cols = row.trim().split(/[\t,]+/); 
-                if(cols.length >= 2) {
-                    const d = new Date(cols[0]);
-                    const q = parseFloat(cols[1]);
-                    if(!isNaN(d.getTime()) && !isNaN(q)) newData.push({date: d, q: q});
-                }
-            });
-            if(newData.length > 0) processRawData(newData);
-        }
-
-        function handleFileUpload(input) {
-            const file = input.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const text = e.target.result;
-                const rows = text.trim().split(/\r?\n/);
-                const newData = [];
-                let startIdx = 0;
-                if(rows.length > 0 && isNaN(parseFloat(rows[0].split(/[\t,]+/)[1]))) startIdx = 1;
-                for(let i = startIdx; i < rows.length; i++) {
-                    const cols = rows[i].trim().split(/[\t,]+/);
-                    if(cols.length >= 2) {
-                        const d = new Date(cols[0]);
-                        const q = parseFloat(cols[1]);
-                        if(!isNaN(d.getTime()) && !isNaN(q)) newData.push({date: d, q: q});
-                    }
-                }
-                if(newData.length > 0) processRawData(newData);
-            };
-            reader.readAsText(file);
-        }
-
-        function clearHistory() {
-            historyData = [];
-            document.getElementById('historyPasteArea').value = '';
-            document.getElementById('input-date-start').valueAsDate = new Date();
-            updateDCA(false);
-        }
-
         function setTableView(mode) {
             tableView = mode;
             const btns = { month: 'btn-month', day: 'btn-day', year: 'btn-year' };
             const activeClass = "px-3 py-1 rounded bg-white shadow-sm font-semibold";
             const inactiveClass = "px-3 py-1 rounded hover:bg-white hover:shadow-sm transition-all";
-            
             Object.keys(btns).forEach(k => {
                 document.getElementById(btns[k]).className = (k === mode) ? activeClass : inactiveClass;
             });
             updateDCA(false);
         }
 
-        // --- 6. CORE CALCULATION ---
+        // --- CALCULATION ---
         function calculateDCA() {
             const qi = parseFloat(document.getElementById('input-qi').value);
             const Di_pct_yr = parseFloat(document.getElementById('input-di').value);
@@ -796,26 +942,22 @@
 
             let histCum = 0;
             const fitLine = [];
+            
+            // Prepare Data with Unit Factor
+            const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
+
             if (historyData.length > 0) {
                 for(let i=0; i<historyData.length; i++) {
-                     // CALCULATE ACTUAL DURATION BETWEEN DATA POINTS
                      let days = 0;
-                     
                      if (i < historyData.length - 1) {
-                         // Forward Difference
                          days = (historyData[i+1].date - historyData[i].date) / (1000 * 60 * 60 * 24);
                      } else {
-                         // Last Data Point: Use previous interval as estimate (or 1 day if single point)
-                         if (i > 0) {
-                             days = (historyData[i].date - historyData[i-1].date) / (1000 * 60 * 60 * 24);
-                         } else {
-                             days = 1; // Default for single data point (daily rate)
-                         }
+                         days = (i > 0) ? (historyData[i].date - historyData[i-1].date) / (1000 * 60 * 60 * 24) : 1;
                      }
-                     // Ensure positive days (in case of sort error) and handle 0 diff
                      if(days <= 0) days = 1; 
 
-                     const vol = historyData[i].q * days; 
+                     const val = historyData[i].q * factor;
+                     const vol = val * days; 
                      histCum += vol;
 
                      const t = historyData[i].t_months;
@@ -829,11 +971,7 @@
             let t_offset = 0;
             if(historyData.length > 0) {
                 const startHist = historyData[0].date;
-                const diffTime = startDateInput - startHist; 
-                const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44);
-                t_offset = diffMonths;
-            } else {
-                t_offset = 0; 
+                t_offset = (startDateInput - startHist) / (1000 * 60 * 60 * 24 * 30.44);
             }
 
             const forecastLine = []; 
@@ -841,7 +979,7 @@
             let remReserves = 0;
             let eolDate = "-";
             
-            // CHART CALC
+            // Forecast Generation
             for(let m = 0; m <= forecastMonthsSlider; m++) {
                 const t = t_offset + m;
                 let q_calc = 0;
@@ -855,68 +993,41 @@
                 forecastLine.push({ t: t, q: q_calc, date: currentD });
             }
 
-            // TABLE CALC (Cumulative starts from 0 at forecast start)
+            // Table
             let cumForecast = 0;
             let m = 0;
             let productionActive = true;
             
             if(tableView === 'year') {
-                // YEARLY AGGREGATION
-                let yearVol = 0;
-                let yearCount = 1;
-                let monthsInYear = 0;
-
-                while(productionActive && m < 1200) { // Max 100 years
+                let yearVol = 0; let monthsInYear = 0; let yearCount = 1;
+                while(productionActive && m < 1200) {
                     const t = t_offset + m;
                     const t_safe = Math.max(0, t);
                     let q = (b === 0) ? qi * Math.exp(-Di_m * t_safe) : qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
-
                     if(q < q_el) {
-                        productionActive = false;
-                        q = 0;
+                        productionActive = false; q = 0;
                         const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
                     } else {
-                        const vol = q * 30.44; 
-                        yearVol += vol;
-                        remReserves += vol;
-                        cumForecast += vol;
-                        monthsInYear++;
-
-                        // Check end of year (every 12 months)
+                        const vol = q * 30.44; yearVol += vol; remReserves += vol; cumForecast += vol; monthsInYear++;
                         if ((m + 1) % 12 === 0) {
-                            const avgRate = yearVol / 365.25; 
                             forecastTableData.push({ 
-                                label: `Year ${yearCount}`, 
-                                q: avgRate, 
-                                vol: yearVol, 
-                                cum: cumForecast,
-                                isYearly: true
+                                label: `Year ${yearCount}`, q: yearVol/365.25, vol: yearVol, cum: cumForecast, isYearly: true
                             });
-                            yearVol = 0;
-                            monthsInYear = 0;
-                            yearCount++;
+                            yearVol = 0; monthsInYear = 0; yearCount++;
                         }
                     }
                     m++;
                 }
-                // Partial year at end
                 if(yearVol > 0) {
-                    const days = monthsInYear * 30.44;
-                    const avgRate = days > 0 ? yearVol / days : 0;
-                    forecastTableData.push({ 
-                        label: `Year ${yearCount}`, 
-                        q: avgRate, 
-                        vol: yearVol, 
-                        cum: cumForecast, 
-                        isYearly: true 
-                    });
+                   forecastTableData.push({ 
+                       label: `Year ${yearCount}`, q: yearVol/(monthsInYear*30.44), vol: yearVol, cum: cumForecast, isYearly: true 
+                   });
                 }
             } else if(tableView === 'month') {
                 while(productionActive && m < 1200) {
                     const t = t_offset + m;
                     const t_safe = Math.max(0, t);
                     let q = (b === 0) ? qi * Math.exp(-Di_m * t_safe) : qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
-                    
                     if(q < q_el) {
                         productionActive = false; q = 0;
                         const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
@@ -927,13 +1038,11 @@
                     }
                     m++;
                 }
-            } else {
-                // DAILY
+            } else { // Daily
                 let d_count = 0;
                 while(productionActive && d_count < 3650) { 
                      const t_days = (t_offset * 30.44) + d_count;
-                     const t_months_equiv = t_days / 30.44;
-                     const t_safe = Math.max(0, t_months_equiv);
+                     const t_safe = Math.max(0, t_days / 30.44);
                      let q = (b === 0) ? qi * Math.exp(-Di_m * t_safe) : qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
                      if(q < q_el) { 
                          productionActive = false; q = 0;
@@ -951,28 +1060,29 @@
             return { fitLine, forecastLine, forecastTableData, histCum, remReserves, eolDate };
         }
 
-        // --- 7. REGRESSION ---
         async function runRegression() {
             if(historyData.length < 3) { alert("Need at least 3 historical data points."); return; }
             
             const useWindow = document.getElementById('check-reg-window').checked;
             let regressionData = [];
             
+            // Factor for regression
+            const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
+            
+            // Create regression dataset with APPLIED factor
+            const regSource = historyData.map(d => ({
+                t_months: d.t_months,
+                q: d.q * factor
+            }));
+
             if (useWindow) {
-                // Get Regression Window
                 const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
                 const regEndIdx = parseInt(document.getElementById('input-reg-end').value);
-                
-                if(regStartIdx >= regEndIdx) { alert("Invalid Regression Window. Start must be before End."); return; }
-
-                // Slice data for regression
-                regressionData = historyData.slice(regStartIdx, regEndIdx + 1);
+                if(regStartIdx >= regEndIdx) { alert("Invalid Window."); return; }
+                regressionData = regSource.slice(regStartIdx, regEndIdx + 1);
             } else {
-                // Use All Data
-                regressionData = historyData;
+                regressionData = regSource;
             }
-
-            if(regressionData.length < 2) { alert("Not enough data points for regression."); return; }
 
             document.getElementById('loadingOverlay').style.display = 'flex';
             await new Promise(r => setTimeout(r, 100));
@@ -980,7 +1090,6 @@
             let bestSSE = Infinity;
             const qiMin = parseFloat(document.getElementById('input-qi').min);
             const qiMax = parseFloat(document.getElementById('input-qi').max);
-            // UPDATED: bMax constraint
             const bMax = 1.0; 
             let bestParams = { qi: 1000, di: 20, b: 0.5 };
             let currentParams = {
@@ -999,9 +1108,8 @@
                 };
                 nextParams.qi = Math.max(qiMin, Math.min(qiMax, nextParams.qi));
                 nextParams.di = Math.max(1, Math.min(300, nextParams.di));
-                nextParams.b = Math.max(0, Math.min(bMax, nextParams.b)); // Apply new bMax constraint
+                nextParams.b = Math.max(0, Math.min(bMax, nextParams.b));
 
-                // PASS SLICED DATA TO SSE CALC
                 const error = calculateSSE(nextParams, regressionData);
                 if (error < bestSSE) {
                     bestSSE = error; bestParams = {...nextParams}; currentParams = {...nextParams};
@@ -1031,22 +1139,29 @@
             return sse;
         }
 
-        // --- 8. COPY TABLE FUNCTION ---
         function copyTable() {
             if(!currentForecastData || currentForecastData.length === 0) return;
-            // Removed dynamic units from header as per request
-            let text = "Date/Year\tRate\tVolume\tCummulative\n";
+            
+            // Determine units
+            const unitRate = fluidType === 'gas' ? 'MMscfd' : 'BOPD';
+            const unitVol = fluidType === 'gas' ? 'MMscf' : 'Bbl';
+            const unitCum = fluidType === 'gas' ? 'BSCF' : 'MBO';
+
+            let text = `Date/Year\tRate (${unitRate})\tVolume (${unitVol})\tCummulative (${unitCum})\n`;
+            
             currentForecastData.forEach(row => {
                 const dateStr = row.isYearly ? row.label : row.date.toISOString().split('T')[0];
-                text += `${dateStr}\t${row.q.toFixed(2)}\t${row.vol.toFixed(2)}\t${row.cum.toFixed(2)}\n`;
+                // Divide cum by 1000 to convert Bbl->MBO or MMscf->Bscf
+                const cumVal = row.cum / 1000;
+                text += `${dateStr}\t${row.q.toFixed(2)}\t${row.vol.toFixed(2)}\t${cumVal.toFixed(2)}\n`;
             });
 
             const ta = document.createElement("textarea");
             ta.value = text;
             document.body.appendChild(ta);
             ta.select();
-            try {
-                document.execCommand('copy');
+            try { 
+                document.execCommand('copy'); 
                 const btn = document.getElementById('btn-copy');
                 const originalHtml = btn.innerHTML;
                 btn.innerHTML = '<i class="fas fa-check"></i> Copied';
@@ -1055,7 +1170,32 @@
             document.body.removeChild(ta);
         }
 
-        // --- UI UPDATER ---
+        function downloadCSV() {
+            if(!currentForecastData || currentForecastData.length === 0) return;
+            
+            const unitRate = fluidType === 'gas' ? 'MMscfd' : 'BOPD';
+            const unitVol = fluidType === 'gas' ? 'MMscf' : 'Bbl';
+            const unitCum = fluidType === 'gas' ? 'BSCF' : 'MBO';
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += `Date/Year,Rate (${unitRate}),Volume (${unitVol}),Cummulative (${unitCum})\n`;
+            
+            currentForecastData.forEach(row => {
+                const dateStr = row.isYearly ? row.label : row.date.toISOString().split('T')[0];
+                // Divide cum by 1000 to convert Bbl->MBO or MMscf->Bscf
+                const cumVal = row.cum / 1000;
+                const rowStr = `${dateStr},${row.q.toFixed(2)},${row.vol.toFixed(2)},${cumVal.toFixed(2)}`;
+                csvContent += rowStr + "\n";
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `dca_forecast_${tableView}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
         function updateDCA(isRegression = false) {
             const res = calculateDCA();
             currentForecastData = res.forecastTableData; 
@@ -1066,16 +1206,14 @@
             document.getElementById('res-cum').innerText = (res.histCum/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
             document.getElementById('res-eol').innerText = res.eolDate;
 
+            // Table Render
             const tbody = document.getElementById('forecastTableBody');
             tbody.innerHTML = '';
             const renderLimit = 200;
             res.forecastTableData.slice(0, renderLimit).forEach(row => {
                 const tr = document.createElement('tr');
                 tr.className = "border-b hover:bg-gray-50";
-                
-                // Display Date or Year Label
                 const displayDate = row.isYearly ? row.label : row.date.toLocaleDateString();
-
                 tr.innerHTML = `
                     <td class="p-2 text-gray-600">${displayDate}</td>
                     <td class="p-2 font-mono font-bold text-red-500">${fluidType==='gas' ? row.q.toFixed(2) : Math.round(row.q)}</td>
@@ -1090,17 +1228,35 @@
                 tbody.appendChild(tr);
             }
 
+            // Plot
             const isLog = document.getElementById('logScaleToggle').checked;
+            const showFTHP = document.getElementById('showFTHPToggle').checked;
+            const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
+            
+            // Primary Rate Trace
             const traceHist = {
-                x: historyData.map(d => d.date), y: historyData.map(d => d.q),
-                mode: 'markers', type: 'scatter', name: 'History',
+                x: historyData.map(d => d.date), y: historyData.map(d => d.q * factor),
+                mode: 'markers', type: 'scatter', name: `History (${fluidType})`,
                 marker: { color: '#333', size: 5, symbol: 'circle' }
             };
+
+            // FTHP Trace
+            const fthpX = [], fthpY = [];
+            if(showFTHP) {
+                historyData.forEach(d => { if(d.fthp > 0) { fthpX.push(d.date); fthpY.push(d.fthp); } });
+            }
+            const traceFthp = {
+                x: fthpX, y: fthpY,
+                mode: 'lines', type: 'scatter', name: 'FTHP (psi)',
+                yaxis: 'y2', line: { color: 'green', width: 1.5, dash: 'dot' }
+            };
+
             const traceFit = {
                 x: res.fitLine.map(d => d.date), y: res.fitLine.map(d => d.q),
-                mode: 'lines', type: 'scatter', name: 'Hist. Fit',
+                mode: 'lines', type: 'scatter', name: 'Fit',
                 line: { color: '#0083B8', width: 2, dash: 'dash' }
             };
+            
             const fcstX = [], fcstY = [];
             res.forecastLine.forEach(pt => { if(pt.q > 0) { fcstX.push(pt.date); fcstY.push(pt.q); }});
             const traceFcst = {
@@ -1121,67 +1277,63 @@
                 line: { color: 'orange', dash: 'dot', width: 1 }
             };
 
-            // Selected Regression Window Indicator
+             // Regression Window Shape
             const useWindow = document.getElementById('check-reg-window').checked;
             let shapes = [];
-            
             if (useWindow) {
                 const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
                 const regEndIdx = parseInt(document.getElementById('input-reg-end').value);
-                
                 if(historyData.length > 0 && regStartIdx >= 0 && regEndIdx < historyData.length) {
-                    const startD = historyData[regStartIdx].date;
-                    const endD = historyData[regEndIdx].date;
-                    
                     shapes.push({
-                        type: 'rect', 
-                        xref: 'x', 
-                        yref: 'paper', // Use full height
-                        x0: startD, 
-                        x1: endD, 
-                        y0: 0, 
-                        y1: 1, 
-                        fillcolor: 'rgba(0, 131, 184, 0.1)', // Original Opacity
-                        line: { width: 0 }
+                        type: 'rect', xref: 'x', yref: 'paper', x0: historyData[regStartIdx].date, x1: historyData[regEndIdx].date, 
+                        y0: 0, y1: 1, fillcolor: 'rgba(0, 131, 184, 0.1)', line: { width: 0 }
                     });
                 }
             }
 
+            // Traces array
+            const traces = [traceHist, traceFit, traceFcst, traceLimit];
+            if(showFTHP) {
+                traces.push(traceFthp);
+            }
+
+            let plotTitle = "Production Rate vs Date";
+            if(wellName.trim() !== "" || zoneName.trim() !== "") {
+               const parts = [];
+               if(wellName.trim()) parts.push(wellName);
+               if(zoneName.trim()) parts.push(zoneName);
+               plotTitle += `<br><span style="font-size: 14px; color: #555;">${parts.join(" | ")}</span>`;
+            }
+
             const layout = {
-                title: 'Production Rate vs Date',
+                title: {
+                    text: plotTitle,
+                    y: 0.95
+                },
                 font: { family: '"Source Sans Pro", sans-serif' },
                 xaxis: { title: 'Date' },
                 yaxis: { title: `Rate (${fluidType === 'gas' ? 'MMscfd' : 'BOPD'})`, type: isLog ? 'log' : 'linear' },
+                yaxis2: showFTHP ? { 
+                    title: 'FTHP (psi)', 
+                    overlaying: 'y', 
+                    side: 'right', 
+                    showgrid: false, 
+                    titlefont: {color:'green'}, 
+                    tickfont: {color:'green'} 
+                } : { visible: false },
                 paper_bgcolor: 'white', plot_bgcolor: 'white',
-                margin: { t: 40, r: 20, l: 60, b: 40 }, legend: { x: 1, xanchor: 'right', y: 1 },
+                margin: { t: 60, r: showFTHP ? 50 : 20, l: 60, b: 40 },
+                legend: { x: 1.1, xanchor: 'left', y: 1 },
                 shapes: shapes
             };
 
-            Plotly.react('dcaChart', [traceHist, traceFit, traceFcst, traceLimit], layout, {displayModeBar: false});
-        }
-
-        function downloadCSV() {
-            if(!currentForecastData || currentForecastData.length === 0) return;
-            let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += "Date/Year,Rate,Volume,Cummulative\n";
-            currentForecastData.forEach(row => {
-                const dateStr = row.isYearly ? row.label : row.date.toISOString().split('T')[0];
-                const rowStr = `${dateStr},${row.q.toFixed(2)},${row.vol.toFixed(2)},${row.cum.toFixed(2)}`;
-                csvContent += rowStr + "\n";
-            });
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `dca_forecast_${tableView}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            Plotly.react('dcaChart', traces, layout, {displayModeBar: false});
         }
 
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
-        updateFluidSettings(); 
         loadExampleData(); 
+        updateFluidSettings();
         window.onresize = () => Plotly.Plots.resize('dcaChart');
 
     </script>
