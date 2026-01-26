@@ -378,13 +378,16 @@
                     <span id="res-eol">-</span>
                 </div>
             </div>
-            <!-- NEW CARD: Decline Info -->
+            <!-- NEW CARD: Decline Info (UPDATED STYLE) -->
             <div class="bg-white border p-4 rounded-lg shadow-sm">
-                <div class="text-xs text-gray-500">Decline Info</div>
+                <div class="text-xs text-gray-500">Decline Info (Di)</div>
                 <div class="text-2xl font-bold text-gray-800">
-                    <span id="res-di">20</span><span class="text-sm">%</span>
+                    <span id="res-di">20.00</span><span class="text-sm text-gray-500">%</span>
                 </div>
-                <div class="text-xs text-gray-500">b = <span id="res-b">0.5</span></div>
+                <div class="text-sm text-gray-500 mt-1 flex items-baseline gap-1">
+                    <span>b =</span>
+                    <span id="res-b" class="text-2xl font-bold text-gray-800">0.50</span>
+                </div>
             </div>
         </div>
 
@@ -1443,9 +1446,12 @@
             document.getElementById('res-cum').innerText = (res.histCum/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
             document.getElementById('res-eol').innerText = res.eolDate;
 
-            // Update New Card (Decline Info)
-            document.getElementById('res-di').innerText = document.getElementById('input-di').value;
-            document.getElementById('res-b').innerText = document.getElementById('input-b').value;
+            // Update New Card (Decline Info) with 2 Decimal Places
+            const valDi = parseFloat(document.getElementById('input-di').value);
+            const valB = parseFloat(document.getElementById('input-b').value);
+            
+            document.getElementById('res-di').innerText = valDi.toFixed(2);
+            document.getElementById('res-b').innerText = valB.toFixed(2);
 
             // Table Render
             const tbody = document.getElementById('forecastTableBody');
