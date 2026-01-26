@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        /* STREAMLIT-LIKE STYLING */
+   
         :root {
             --primary-color: #ff4b4b;
             --secondary-color: #0083B8;
@@ -85,33 +85,22 @@
             text-align: right;
         }
         .val-input:focus { border-color: var(--primary-color); outline: none; }
+        
+        /* Disabled Input Style */
+        .val-input:disabled { background-color: #f0f0f0; color: #888; border-color: #eee; }
+        input[type=range]:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        /* SLIDER STYLING (UPDATED FOR FIREFOX COMPATIBILITY) */
-        input[type=range] {
-            -webkit-appearance: none; 
-            appearance: none; 
-            width: 100%; 
-            background: transparent; 
-            cursor: pointer;
-        }
+        /* HIDE NUMBER INPUT SPINNERS (ARROWS) */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
 
-        /* WebKit (Chrome, Safari, Edge) */
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 6px; cursor: pointer; background: #d1d5db; border-radius: 3px;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
-            background: var(--primary-color); margin-top: -5px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); border: 2px solid white;
-        }
-
-        /* Firefox */
-        input[type=range]::-moz-range-track {
-            width: 100%; height: 6px; cursor: pointer; background: #d1d5db; border-radius: 3px;
-        }
-        input[type=range]::-moz-range-thumb {
-            height: 16px; width: 16px; border: 2px solid white; border-radius: 50%;
-            background: var(--primary-color); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        }
+        /* SLIDER STYLING */
+        input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; cursor: pointer; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #d1d5db; border-radius: 3px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: var(--primary-color); margin-top: -5px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); border: 2px solid white; }
+        input[type=range]::-moz-range-track { width: 100%; height: 6px; cursor: pointer; background: #d1d5db; border-radius: 3px; }
+        input[type=range]::-moz-range-thumb { height: 16px; width: 16px; border: 2px solid white; border-radius: 50%; background: var(--primary-color); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
 
         .st-button {
             background-color: #ffffff; color: var(--text-color); border: 1px solid rgba(49, 51, 63, 0.2);
@@ -170,8 +159,6 @@
         
         <h2 style="font-size: 1.5rem; margin-top: 0; margin-bottom: 1rem;">Decline Curve Parameters</h2>
         
-        <!-- (WELL INFO REMOVED FROM HERE) -->
-
         <!-- FLUID TYPE -->
         <label class="slider-label">Fluid Type</label>
         <div class="st-radio-group">
@@ -183,12 +170,75 @@
             </label>
         </div>
 
+        <!-- GAS UNIT OPTION -->
+        <div id="gasUnitContainer" style="display:none; margin-bottom: 1rem; padding: 0.5rem; background-color: #e6f3ff; border-radius: 4px; border: 1px solid #bce0fd;">
+            <label class="slider-label" style="font-size:12px; color:var(--secondary-color);">Gas Data Input Unit</label>
+            <div class="st-radio-group" style="margin-bottom: 0.25rem; margin-top: 0.25rem;">
+                <label class="st-radio-option" style="font-size: 12px;">
+                    <input type="radio" name="gasUnit" value="mscfd" onchange="handleGasUnitChange()"> Mscfd
+                </label>
+                <label class="st-radio-option" style="font-size: 12px;">
+                    <input type="radio" name="gasUnit" value="mmscfd" checked onchange="handleGasUnitChange()"> MMscfd
+                </label>
+            </div>
+            <div class="text-[10px] text-gray-500 italic">Selection will auto-convert value to MMscfd for plot.</div>
+        </div>
+
+        <!-- HISTORICAL DATA SOURCE -->
+        <label class="slider-label" style="display:block; margin-bottom:0.5rem; margin-top:1rem;">Historical Data Source</label>
+        
+        <!-- Tab Buttons -->
+        <div class="flex gap-2 mb-2 text-xs">
+            <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('example')">Example</button>
+            <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('upload')">Upload</button>
+            <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('paste')">Paste</button>
+        </div>
+
+        <!-- TAB: EXAMPLE -->
+        <div id="tab-example" class="input-tab bg-blue-50 p-3 rounded border border-blue-100 mb-2">
+            <div class="text-xs text-blue-800 mb-2">Use built-in example data based on Fluid Type.</div>
+            <button class="st-button primary" onclick="loadExampleData()" style="margin:0; font-size:12px;">Load Example Data</button>
+        </div>
+
+        <!-- TAB: UPLOAD -->
+        <div id="tab-upload" class="input-tab bg-white p-3 rounded border mb-2">
+             <div class="text-xs text-gray-500 mb-2"><b>CSV File</b></div>
+             <div class="text-[10px] text-gray-400 mb-2">
+                 Format: <b>Date, <span id="label-upload-rate">Oil Rate (BOPD)</span>, Choke Size</b>
+             </div>
+             <input type="file" id="csvFile" accept=".csv" onchange="handleFileUpload(this)" style="font-size: 11px; width: 100%;">
+        </div>
+
+        <!-- TAB: PASTE -->
+        <div id="tab-paste" class="input-tab bg-white p-3 rounded border mb-2">
+            <div class="text-xs text-gray-500 mb-2" id="hint-paste-format">
+                Format: <code>Date [tab] Rate [tab] Choke</code>
+            </div>
+            <div class="text-[10px] text-gray-400 mb-1">Supports <code>DD/MM/YYYY</code>, <code>DD/MM/YY</code>, <code>DD-MMM-YY</code></div>
+            <textarea id="historyPasteArea" class="st-textarea" placeholder="01/Jan/23	1000	32/64..." oninput="handleHistoryPaste(this.value)"></textarea>
+            <button class="st-button" onclick="clearHistory()" style="margin-top:5px; font-size:12px;">Clear Data</button>
+        </div>
+        
+        <!-- PROJECT MANAGEMENT -->
+        <div class="mb-4 p-2 bg-gray-100 rounded border border-gray-200">
+            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Project Management</h3>
+            <div class="flex gap-2">
+                <button class="st-button success" onclick="saveProjectCSV()" style="margin:0; font-size:12px;">
+                    <i class="fas fa-file-csv mr-1"></i> Save
+                </button>
+                <button class="st-button" onclick="document.getElementById('projectFileInput').click()" style="margin:0; font-size:12px;">
+                    <i class="fas fa-folder-open mr-1"></i> Load
+                </button>
+                <input type="file" id="projectFileInput" accept=".json,.csv,.txt" onchange="loadProject(this)">
+            </div>
+        </div>
+
         <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1rem 0;">
 
         <!-- PARAMETER SLIDERS -->
         <div class="slider-container">
             <div class="slider-header">
-                <span class="slider-label">Initial Rate, qi (<span id="unit-qi">BOPD</span>)</span>
+                <span class="slider-label">Initial Rate, qi (<span class="unit-qi">BOPD</span>)</span>
                 <input type="number" id="input-qi-num" class="val-input" onchange="syncInput('qi', 'num')">
             </div>
             <input type="range" id="input-qi" min="10" max="2000" step="1" oninput="syncInput('qi', 'slider')">
@@ -207,8 +257,54 @@
                 <span class="slider-label">Hyperbolic Exponent, b</span>
                 <input type="number" id="input-b-num" class="val-input" step="0.05" onchange="syncInput('b', 'num')">
             </div>
-            <input type="range" id="input-b" min="0" max="1.0" step="0.05" value="0.5" oninput="syncInput('b', 'slider')">
+            <!-- DEFAULT B SET TO 0 -->
+            <input type="range" id="input-b" min="0" max="1.0" step="0.05" value="0" oninput="syncInput('b', 'slider')">
             <div class="text-[10px] text-gray-400 mt-1 italic">Note: If b=0, it is Exponential</div>
+        </div>
+
+        <!-- REGRESSION CONTROLS -->
+        <div class="mt-4 mb-4 p-2 bg-gray-50 rounded border border-gray-200">
+            <div class="flex justify-between items-center mb-2">
+                 <label class="text-xs font-bold text-gray-600">AUTO-FIT REGRESSION</label>
+                 <div class="flex items-center gap-1">
+                     <input type="checkbox" id="check-reg-window" onchange="toggleRegWindow()" class="w-3 h-3 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
+                     <label for="check-reg-window" class="text-[10px] font-medium text-gray-700 cursor-pointer">Use Window</label>
+                 </div>
+            </div>
+
+            <div id="reg-window-container" class="bg-white p-2 rounded border border-gray-100 mb-2" style="display:none;">
+                <div class="flex justify-between text-xs mb-1 text-gray-600">
+                    <span>Start: <span id="reg-start-date" class="font-mono font-bold">-</span></span>
+                </div>
+                <input type="range" id="input-reg-start" min="0" max="10" step="1" value="0" oninput="updateRegressionUI()">
+                
+                <div class="flex justify-between text-xs mt-2 mb-1 text-gray-600">
+                    <span>End: <span id="reg-end-date" class="font-mono font-bold">-</span></span>
+                </div>
+                <input type="range" id="input-reg-end" min="0" max="10" step="1" value="10" oninput="updateRegressionUI()">
+            </div>
+
+            <button class="st-button success" onclick="runRegression()" style="margin-bottom:0;">📈 Perform Regression Analysis</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1.5rem 0;">
+
+        <!-- FORECAST SETTINGS -->
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Forecast Settings</h3>
+
+        <!-- FORECAST INITIAL RATE (OPTIONAL) -->
+        <div class="slider-container" style="background-color: #fafafa; padding: 8px; border-radius: 6px; border: 1px solid #eee;">
+             <div class="flex items-center gap-2 mb-2">
+                <input type="checkbox" id="check-override-forecast-qi" onchange="toggleForecastOverride()" class="w-3 h-3 text-blue-600 rounded">
+                <label for="check-override-forecast-qi" class="text-[11px] font-bold text-gray-600 cursor-pointer uppercase">Manual Override Qi</label>
+            </div>
+            
+            <div class="slider-header">
+                <span class="slider-label" style="color:var(--primary-color);">Forecast Qi (<span class="unit-qi">BOPD</span>)</span>
+                <input type="number" id="input-qi-forecast-num" class="val-input" onchange="syncInput('qi-forecast', 'num')" disabled>
+            </div>
+            <input type="range" id="input-qi-forecast" min="10" max="2000" step="1" oninput="syncInput('qi-forecast', 'slider')" disabled>
+            <div class="text-[10px] text-gray-400 mt-1 italic" id="qi-forecast-hint">Auto-syncs with Regression End Rate</div>
         </div>
 
         <div class="slider-container">
@@ -238,133 +334,22 @@
             <input type="range" id="input-el" min="0" max="500" step="1" value="50" oninput="syncInput('el', 'slider')">
         </div>
 
-        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1.5rem 0;">
-
-        <!-- REGRESSION CONTROLS -->
-        <label class="slider-label" style="display:block; margin-bottom:0.5rem; color:var(--secondary-color);">Auto-Fit Regression</label>
-        
-        <!-- Checkbox to Enable/Disable Window -->
-        <div class="flex items-center gap-2 mb-2">
-             <input type="checkbox" id="check-reg-window" onchange="toggleRegWindow()" class="w-3 h-3 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
-             <label for="check-reg-window" class="text-xs font-medium text-gray-700 cursor-pointer">Enable Regression Window</label>
-        </div>
-
-        <div id="reg-window-container" class="bg-blue-50 p-3 rounded border border-blue-100 mb-2" style="display:none;">
-            <div class="flex justify-between text-xs mb-1 text-gray-600">
-                <span>Start Date</span>
-                <span id="reg-start-date" class="font-mono font-bold">-</span>
-            </div>
-            <input type="range" id="input-reg-start" min="0" max="10" step="1" value="0" oninput="updateRegressionUI()">
-            
-            <div class="flex justify-between text-xs mt-2 mb-1 text-gray-600">
-                <span>End Date</span>
-                <span id="reg-end-date" class="font-mono font-bold">-</span>
-            </div>
-            <input type="range" id="input-reg-end" min="0" max="10" step="1" value="10" oninput="updateRegressionUI()">
-            
-            <div class="text-[10px] text-gray-400 mt-2 text-center">Select data range used for Auto-Fit</div>
-        </div>
-
-        <button class="st-button success" onclick="runRegression()">⚡ Auto-Fit (Regression)</button>
-
-        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1.5rem 0;">
-
-        <!-- HISTORICAL DATA SOURCE -->
-        <label class="slider-label" style="display:block; margin-bottom:0.5rem;">Historical Data Source</label>
-        
-        <!-- WELL INFO SECTION (MOVED HERE) -->
-        <div class="mb-4 p-3 bg-white rounded border border-gray-200 shadow-sm">
-            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Well Information</label>
-            <div class="grid grid-cols-1 gap-3">
-                <div>
-                    <label class="text-xs text-gray-600 block mb-1 font-semibold">Well Name</label>
-                    <input type="text" id="input-well-name" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-gray-800 focus:border-red-500 focus:outline-none" value="" onchange="updateProjectInfo()">
-                </div>
-                <div>
-                    <label class="text-xs text-gray-600 block mb-1 font-semibold">Zone</label>
-                    <input type="text" id="input-zone-name" class="w-full border border-gray-300 rounded px-2 py-1 text-sm text-gray-800 focus:border-red-500 focus:outline-none" value="" onchange="updateProjectInfo()">
-                </div>
-            </div>
-        </div>
-        
-        <!-- GAS UNIT OPTION (RESTORED HERE) -->
-        <div id="gasUnitContainer" style="display:none; margin-bottom: 1rem; padding: 0.5rem; background-color: #e6f3ff; border-radius: 4px; border: 1px solid #bce0fd;">
-            <label class="slider-label" style="font-size:12px; color:var(--secondary-color);">Gas Data Input Unit</label>
-            <div class="st-radio-group" style="margin-bottom: 0.25rem; margin-top: 0.25rem;">
-                <label class="st-radio-option" style="font-size: 12px;">
-                    <input type="radio" name="gasUnit" value="mscfd" onchange="handleGasUnitChange()"> Mscfd
-                </label>
-                <label class="st-radio-option" style="font-size: 12px;">
-                    <input type="radio" name="gasUnit" value="mmscfd" checked onchange="handleGasUnitChange()"> MMscfd
-                </label>
-            </div>
-            <div class="text-[10px] text-gray-500 italic">Selection will auto-convert value to MMscfd for plot.</div>
-        </div>
-
-        <!-- Tab Buttons -->
-        <div class="flex gap-2 mb-4 text-xs">
-            <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('example')">Example</button>
-            <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('upload')">Upload</button>
-            <button class="px-3 py-1 bg-white border rounded hover:border-red-500 transition-colors" onclick="switchInputTab('paste')">Paste</button>
-        </div>
-
-        <!-- TAB: EXAMPLE -->
-        <div id="tab-example" class="input-tab bg-blue-50 p-3 rounded border border-blue-100 mb-4">
-            <div class="text-xs text-blue-800 mb-2">Use built-in example data based on Fluid Type.</div>
-            <button class="st-button primary" onclick="loadExampleData()" style="margin:0; font-size:12px;">Load Example Data</button>
-        </div>
-
-        <!-- TAB: UPLOAD -->
-        <div id="tab-upload" class="input-tab bg-white p-3 rounded border mb-4">
-             <div class="text-xs text-gray-500 mb-2"><b>CSV File</b></div>
-             <div class="text-[10px] text-gray-400 mb-2">
-                 Format: <b>Date, FTHP (psi), <span id="label-upload-rate">Oil Rate (BOPD)</span></b>
-             </div>
-             <input type="file" id="csvFile" accept=".csv" onchange="handleFileUpload(this)" style="font-size: 11px; width: 100%;">
-        </div>
-
-        <!-- TAB: PASTE -->
-        <div id="tab-paste" class="input-tab bg-white p-3 rounded border mb-4">
-            <div class="text-xs text-gray-500 mb-2" id="hint-paste-format">
-                Format: <code>Date [tab] FTHP (psi) [tab] Rate (BOPD)</code>
-            </div>
-            <div class="text-[10px] text-gray-400 mb-1">Supports <code>DD/MM/YYYY</code> or <code>YYYY-MM-DD</code></div>
-            <textarea id="historyPasteArea" class="st-textarea" placeholder="01/01/2023	400	1000..." oninput="handleHistoryPaste(this.value)"></textarea>
-            <button class="st-button" onclick="clearHistory()" style="margin-top:5px; font-size:12px;">Clear Data</button>
-        </div>
-
-        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1.5rem 0;">
-
-        <!-- PROJECT MANAGEMENT (MOVED HERE) -->
-        <div class="mb-6 p-3 bg-gray-100 rounded border border-gray-200">
-            <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Project Management</h3>
-            <div class="flex gap-2">
-                <button class="st-button success" onclick="saveProjectCSV()" style="margin:0; font-size:12px;">
-                    <i class="fas fa-file-csv mr-1"></i> Save CSV
-                </button>
-                <button class="st-button" onclick="document.getElementById('projectFileInput').click()" style="margin:0; font-size:12px;">
-                    <i class="fas fa-folder-open mr-1"></i> Load File
-                </button>
-                <input type="file" id="projectFileInput" accept=".json,.csv,.txt" onchange="loadProject(this)">
-            </div>
-            <div class="text-[10px] text-gray-400 mt-1">Supports editable CSV format.</div>
-        </div>
-
     </div>
 
     <!-- MAIN CONTENT -->
     <div id="main-container">
         <h1 class="text-2xl font-bold mb-4">Decline Curve Analysis (DCA)</h1>
         
-        <!-- CONTROL BAR (Log Scale + FTHP Toggle) -->
+        <!-- CONTROL BAR -->
         <div class="flex items-center gap-4 mb-4">
             <div class="flex items-center gap-2">
                 <input type="checkbox" id="logScaleToggle" onchange="updateDCA(false)" class="w-4 h-4 text-red-600 rounded">
                 <label for="logScaleToggle" class="text-sm font-medium">Logarithmic Scale</label>
             </div>
             <div class="flex items-center gap-2">
-                <input type="checkbox" id="showFTHPToggle" onchange="updateDCA(false)" class="w-4 h-4 text-green-600 rounded">
-                <label for="showFTHPToggle" class="text-sm font-medium">Show FTHP (Pressure)</label>
+                <!-- UPDATED LABEL -->
+                <input type="checkbox" id="showChokeToggle" onchange="updateDCA(false)" class="w-4 h-4 text-green-600 rounded">
+                <label for="showChokeToggle" class="text-sm font-medium">Show Choke Size</label>
             </div>
         </div>
 
@@ -437,12 +422,11 @@
     <script>
         // --- GLOBAL STATE ---
         let fluidType = 'oil'; 
-        let historyData = []; // { date, fthp, q (in stored unit) }
+        let historyData = []; // { date, q (rate), choke (secondary) }
         let tableView = 'month';
         let currentForecastData = []; 
         let gasInputUnit = 'mmscfd'; // 'mscfd' or 'mmscfd'
-        let wellName = '';
-        let zoneName = '';
+        let lastCalculatedEndRate = 0; // To store last fit rate
 
         // Init Input Tabs
         function switchInputTab(tabName) {
@@ -455,8 +439,6 @@
         
         function saveProjectCSV() {
             let csv = "[PARAMETERS]\nParameter,Value\n";
-            csv += `wellName,${wellName}\n`;
-            csv += `zoneName,${zoneName}\n`;
             csv += `fluidType,${fluidType}\n`;
             csv += `gasInputUnit,${gasInputUnit}\n`;
             csv += `qi,${document.getElementById('input-qi').value}\n`;
@@ -470,15 +452,16 @@
             csv += `regStart,${document.getElementById('input-reg-start').value}\n`;
             csv += `regEnd,${document.getElementById('input-reg-end').value}\n`;
             csv += `logScale,${document.getElementById('logScaleToggle').checked}\n`;
-            csv += `showFTHP,${document.getElementById('showFTHPToggle').checked}\n`;
+            csv += `showChoke,${document.getElementById('showChokeToggle').checked}\n`;
+            csv += `overrideQi,${document.getElementById('check-override-forecast-qi').checked}\n`;
+            csv += `qiForecast,${document.getElementById('input-qi-forecast').value}\n`;
             
-            // Just store whatever is current historyData
-            // Column names adapt to fluidType just for labeling
+            // UPDATED: Save Order: Date, Rate, Choke
             const rateLabel = fluidType === 'gas' ? 'GasRate' : 'OilRate';
-            csv += `\n[HISTORY]\nDate,FTHP,${rateLabel}\n`;
+            csv += `\n[HISTORY]\nDate,${rateLabel},ChokeSize\n`;
             historyData.forEach(d => {
                 const dateStr = d.date.toISOString().split('T')[0];
-                csv += `${dateStr},${d.fthp || 0},${d.q}\n`;
+                csv += `${dateStr},${d.q},${d.choke || 0}\n`;
             });
 
             const dataStr = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
@@ -498,7 +481,7 @@
             reader.onload = function(e) {
                 const content = e.target.result;
                 if(content.trim().startsWith("{")) {
-                    loadJSONProject(content); // Legacy JSON support (simplified)
+                    loadJSONProject(content); 
                 } else if(content.includes("[PARAMETERS]")) {
                     loadCSVProject(content);
                 } else {
@@ -521,9 +504,9 @@
                     if(!cleanLine) return;
                     
                     if(cleanLine === "[PARAMETERS]") { section = "PARAMS"; return; }
-                    if(cleanLine === "[HISTORY]") { section = "HISTORY"; return; } // Old format
-                    if(cleanLine === "[HISTORY_RAW]") { section = "HISTORY"; return; } // Transition format
-                    if(cleanLine.startsWith("[HISTORY]")) { section = "HISTORY"; return; } // Generic match
+                    if(cleanLine === "[HISTORY]") { section = "HISTORY"; return; } 
+                    if(cleanLine === "[HISTORY_RAW]") { section = "HISTORY"; return; } 
+                    if(cleanLine.startsWith("[HISTORY]")) { section = "HISTORY"; return; } 
                     
                     if(section === "PARAMS") {
                         const parts = cleanLine.split(",");
@@ -535,28 +518,21 @@
                         }
                     } else if(section === "HISTORY") {
                         const parts = cleanLine.split(",");
+                        // Handling CSV loading for history
+                        // Legacy might be Date,FTHP,Rate. New is Date,Rate,Choke
+                        // We will follow the new parser logic logic `parseRawLine` or simpler here
                         if(parts.length >= 2 && parts[0] !== "Date") {
-                            // Try to detect column count
-                            // Format requested: Date, FTHP, Rate
-                            // But backward compatibility needed
-                            const d = parseDate(parts[0]);
-                            if(d && !isNaN(d.getTime())) {
-                                // Default assignment if 3 cols: Date, FTHP, Rate
-                                // If 2 cols: Date, Rate (assume FTHP=0)
-                                let fthp = 0;
-                                let rate = 0;
-                                
-                                if(parts.length === 2) {
-                                    rate = parseFloat(parts[1]);
-                                } else if (parts.length >= 3) {
-                                    fthp = parseFloat(parts[1]);
-                                    rate = parseFloat(parts[2]);
-                                }
-                                
-                                if(!isNaN(rate)) {
-                                    newHistory.push({ date: d, fthp: fthp || 0, q: rate });
-                                }
-                            }
+                             const d = parseDate(parts[0]);
+                             if(d && !isNaN(d.getTime())) {
+                                 // Assume NEW format: Date, Rate, Choke
+                                 let rate = parseFloat(parts[1]);
+                                 let choke = 0;
+                                 if(parts.length >= 3) choke = parseFloat(parts[2]);
+                                 
+                                 if(!isNaN(rate)) {
+                                     newHistory.push({ date: d, q: rate, choke: choke || 0 });
+                                 }
+                             }
                         }
                     }
                 });
@@ -580,11 +556,11 @@
                     dateStart: state.params.dateStart,
                     timeShift: state.params.timeShift
                 };
-                // Fallback map
+                // Map old JSON fields if necessary
                 const newHistory = (state.historyData || []).map(d => ({ 
                     date: new Date(d.date), 
                     q: d.q,
-                    fthp: d.fthp || 0
+                    choke: d.fthp || d.choke || 0 
                 }));
                 applyLoadedData(params, newHistory);
             } catch(e) { alert("Error loading JSON"); }
@@ -593,30 +569,29 @@
         function applyLoadedData(params, newHistory) {
             fluidType = params.fluidType || 'oil';
             gasInputUnit = params.gasInputUnit || 'mmscfd';
-            wellName = params.wellName || '';
-            // Handle legacy "layerName" or new "zoneName"
-            zoneName = params.zoneName || params.layerName || '';
             
-            // Set UI for well/zone
-            document.getElementById('input-well-name').value = wellName;
-            document.getElementById('input-zone-name').value = zoneName;
-
-            // Set Radios
             const fRadios = document.getElementsByName('fluidType');
             for(const r of fRadios) { if(r.value === fluidType) r.checked = true; }
             const gRadios = document.getElementsByName('gasUnit');
             for(const r of gRadios) { if(r.value === gasInputUnit) r.checked = true; }
 
-            // Set Data
             const sorted = newHistory.sort((a,b) => a.date - b.date);
             processHistoryData(sorted);
 
-            // Params
             if(params.qi) document.getElementById('input-qi').value = params.qi;
             if(params.di) document.getElementById('input-di').value = params.di;
             if(params.b) document.getElementById('input-b').value = params.b;
             if(params.months) document.getElementById('input-months').value = params.months;
             if(params.el) document.getElementById('input-el').value = params.el;
+            
+            if(params.overrideQi !== undefined) {
+                 document.getElementById('check-override-forecast-qi').checked = (String(params.overrideQi) === "true");
+                 toggleForecastOverride();
+            }
+            if(params.qiForecast) {
+                 document.getElementById('input-qi-forecast').value = params.qiForecast;
+                 document.getElementById('input-qi-forecast-num').value = params.qiForecast;
+            }
 
             ['qi', 'di', 'b', 'months', 'el'].forEach(id => {
                 document.getElementById(`input-${id}-num`).value = document.getElementById(`input-${id}`).value;
@@ -628,9 +603,10 @@
                 document.getElementById('val-time-shift').innerText = (parseInt(params.timeShift) > 0 ? "+" : "") + params.timeShift;
             }
 
-            // Restore FTHP Toggle
-            if(params.showFTHP !== undefined) {
-                document.getElementById('showFTHPToggle').checked = (String(params.showFTHP) === "true");
+            if(params.showChoke !== undefined) {
+                document.getElementById('showChokeToggle').checked = (String(params.showChoke) === "true");
+            } else if(params.showFTHP !== undefined) {
+                 document.getElementById('showChokeToggle').checked = (String(params.showFTHP) === "true");
             }
 
             updateFluidSettings();
@@ -638,15 +614,17 @@
         }
 
         // --- HANDLERS ---
-        function updateProjectInfo() {
-            wellName = document.getElementById('input-well-name').value;
-            zoneName = document.getElementById('input-zone-name').value;
-            updateDCA(false);
-        }
 
         function handleFluidChange() {
             const radios = document.getElementsByName('fluidType');
             for(const r of radios) { if(r.checked) fluidType = r.value; }
+            
+            if (fluidType === 'gas') {
+                document.getElementById('input-el').value = 0.1;
+            } else {
+                document.getElementById('input-el').value = 50;
+            }
+
             updateFluidSettings();
             updateDCA(false);
         }
@@ -664,11 +642,10 @@
                 return;
             }
             
-            // Calculate t_months
             const startMs = data[0].date.getTime();
             historyData = data.map(d => ({
                 date: d.date,
-                fthp: d.fthp,
+                choke: d.choke,
                 q: d.q,
                 t_months: (d.date.getTime() - startMs) / (1000 * 60 * 60 * 24 * 30.44)
             }));
@@ -676,73 +653,85 @@
             initRegressionSliders();
         }
 
-        // --- PARSING ---
+        // --- UPDATED DATE PARSING ---
         function parseDate(dateStr) {
             if(!dateStr) return null;
-            // Handle DD/MM/YYYY
-            if(dateStr.includes('/')) {
-                const parts = dateStr.split('/');
-                if(parts.length === 3) {
-                    if(parts[2].length === 4) {
-                        return new Date(parts[2], parts[1]-1, parts[0]);
-                    }
+            let cleanStr = dateStr.trim();
+            
+            // Replace common separators with /
+            cleanStr = cleanStr.replace(/[\-\s]/g, '/');
+            const parts = cleanStr.split('/');
+
+            if(parts.length === 3) {
+                const day = parseInt(parts[0]);
+                let monthStr = parts[1];
+                let year = parseInt(parts[2]);
+
+                // Handle 2 digit year (e.g. 23 -> 2023)
+                if (year < 100) year += 2000;
+
+                // Handle Month
+                let monthIndex = -1;
+                
+                // If month is a number (e.g. 01, 12)
+                if(!isNaN(monthStr)) {
+                    monthIndex = parseInt(monthStr) - 1;
+                } else {
+                    // Try to parse text month (English & Indonesian short/long)
+                    const months = {
+                        "jan":0, "feb":1, "mar":2, "apr":3, "may":4, "mei":4, "jun":5, "jul":6, "aug":7, "agu":7, "agt":7, "sep":8, "oct":9, "okt":9, "nov":10, "dec":11, "des":11,
+                        "januari":0, "februari":1, "maret":2, "april":3, "juni":5, "juli":6, "agustus":7, "september":8, "oktober":9, "november":10, "desember":11
+                    };
+                    const lowerM = monthStr.toLowerCase().substring(0,3); 
+                    const fullLower = monthStr.toLowerCase();
+                    
+                    if(months[fullLower] !== undefined) monthIndex = months[fullLower];
+                    else if(months[lowerM] !== undefined) monthIndex = months[lowerM];
+                }
+
+                if (monthIndex >= 0 && monthIndex < 12 && day > 0 && day <= 31) {
+                    const d = new Date(year, monthIndex, day);
+                    if(!isNaN(d.getTime())) return d;
                 }
             }
+
             // Fallback
             const d = new Date(dateStr);
             return isNaN(d.getTime()) ? null : d;
         }
 
         function parseRawLine(line) {
-            // New Requirement: Date, FTHP, Rate
             const cols = line.trim().split(/[\t,]+/);
             if(cols.length < 2) return null;
 
             const d = parseDate(cols[0]);
             if(!d || isNaN(d.getTime())) return null;
 
-            // Col 1 is FTHP
-            const fthp = parseFloat(cols[1]);
+            // UPDATED PARSING: Date, Rate, Choke
+            let rate = parseFloat(cols[1]);
+            let choke = 0;
             
-            // Col 2 is Rate
-            // If only 2 cols, maybe user pasted Date, Rate?
-            // User explicit request: "date, fthp, rate"
-            // Let's support graceful degradation. If 2 cols found, assume Date, Rate?
-            // Or strictly follow instruction?
-            // "urutannya menjadi date, fthp, oil rate" implies 3 cols.
-            // But if user pastes just 2, we might miss Rate.
-            // Let's try: if 3 cols -> Date, FTHP, Rate. If 2 cols -> Date, Rate (FTHP=0).
-            
-            let rate = 0;
-            let finalFthp = 0;
-
             if(cols.length >= 3) {
-                finalFthp = isNaN(fthp) ? 0 : fthp;
-                rate = parseFloat(cols[2]);
-            } else if (cols.length === 2) {
-                // Ambiguous. Assuming Date, Rate for compatibility with simple lists
-                rate = parseFloat(cols[1]);
+                choke = parseFloat(cols[2]);
+                if(isNaN(choke)) choke = 0;
             }
-
+            
             if(isNaN(rate)) return null;
 
             return {
                 date: d,
-                fthp: finalFthp,
-                q: rate
+                q: rate,
+                choke: choke
             };
         }
 
-        // --- DATA INPUT ---
         function loadExampleData() {
             const data = [];
             const start = new Date();
             start.setMonth(start.getMonth() - 24);
             let q = fluidType === 'oil' ? 1000 : 5000; 
-            let fthp = 400;
+            let choke = 32; // Default starting choke
 
-            // If gas, let's say 5000 mscfd or 5 mmscfd
-            // Let's use 5.0 and set unit to mmscfd
             if(fluidType === 'gas') {
                 q = 5.0;
                 document.querySelector('input[name="gasUnit"][value="mmscfd"]').checked = true;
@@ -753,13 +742,13 @@
                 const d = new Date(start);
                 d.setMonth(start.getMonth() + i);
                 
-                // decline
                 q = q * Math.exp(-0.02) * (0.95 + Math.random()*0.1);
-                fthp = fthp * 0.98;
+                // Simulate step choke change
+                if (i % 6 === 0) choke += 2;
 
                 data.push({
                     date: d,
-                    fthp: Math.round(fthp),
+                    choke: choke,
                     q: q
                 });
             }
@@ -767,13 +756,20 @@
             const sorted = data.sort((a,b) => a.date - b.date);
             processHistoryData(sorted);
             
-            // Set Date Start
             if(historyData.length > 0) {
                 const lastDate = historyData[historyData.length-1].date;
                 const nextDay = new Date(lastDate);
                 document.getElementById('input-date-start').valueAsDate = nextDay;
                 document.getElementById('input-time-shift').value = 0;
             }
+            
+            // Set default b=0 for new example load as well
+            document.getElementById('input-b').value = 0;
+            document.getElementById('input-b-num').value = 0;
+
+            // Initial sync: Use syncForecastToRegression to ensure consistency
+            syncForecastToRegression();
+
             updateDCA(false);
         }
 
@@ -802,9 +798,12 @@
                 const text = e.target.result;
                 const rows = text.trim().split(/\r?\n/);
                 const newData = [];
-                // Skip header if non-numeric
                 let startIdx = 0;
-                if(rows.length > 0 && isNaN(parseFloat(rows[0].split(/[\t,]+/)[1]))) startIdx = 1;
+                // Simple heuristic to skip header if first col not date
+                if(rows.length > 0) {
+                    const firstCell = rows[0].split(/[\t,]+/)[0];
+                    if(isNaN(Date.parse(firstCell)) && !parseDate(firstCell)) startIdx = 1;
+                }
                 
                 for(let i = startIdx; i < rows.length; i++) {
                     const item = parseRawLine(rows[i]);
@@ -832,13 +831,86 @@
             const slider = document.getElementById(`input-${id}`);
             const num = document.getElementById(`input-${id}-num`);
             if (source === 'slider') { num.value = slider.value; } else { slider.value = num.value; }
+            
+            // Sync Forecast Qi secara real-time saat parameter regresi manual berubah
+            if (['qi', 'di', 'b'].includes(id)) {
+                syncForecastToRegression();
+            }
+
             updateDCA(false);
+        }
+
+        // FUNGSI BARU: Menghitung rate akhir dari regresi saat ini dan mengupdate forecast qi
+        function syncForecastToRegression() {
+            if(document.getElementById('check-override-forecast-qi').checked) return;
+            if(historyData.length === 0) return;
+
+            const qi = parseFloat(document.getElementById('input-qi').value);
+            const Di_pct_yr = parseFloat(document.getElementById('input-di').value);
+            const b = parseFloat(document.getElementById('input-b').value);
+            const Di_m = (Di_pct_yr / 100) / 12;
+
+            let finalT = 0;
+            const useWindow = document.getElementById('check-reg-window').checked;
+            
+            if (useWindow) {
+                const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
+                const regEndIdx = parseInt(document.getElementById('input-reg-end').value);
+                if(historyData[regStartIdx] && historyData[regEndIdx]) {
+                    finalT = historyData[regEndIdx].t_months - historyData[regStartIdx].t_months;
+                }
+            } else {
+                finalT = historyData[historyData.length-1].t_months - historyData[0].t_months;
+            }
+
+            let q_final = 0;
+            if (b === 0) {
+                    q_final = qi * Math.exp(-Di_m * finalT);
+            } else {
+                    const base = 1 + b * Di_m * finalT;
+                    if (base > 0) {
+                        q_final = qi / Math.pow(base, (1/b));
+                    }
+            }
+
+            lastCalculatedEndRate = q_final;
+            
+            const fSlider = document.getElementById('input-qi-forecast');
+            const fNum = document.getElementById('input-qi-forecast-num');
+            
+            if(fSlider && fNum) {
+                fSlider.value = q_final;
+                fNum.value = q_final.toFixed(2);
+            }
+        }
+
+        function toggleForecastOverride() {
+            const isChecked = document.getElementById('check-override-forecast-qi').checked;
+            const slider = document.getElementById('input-qi-forecast');
+            const num = document.getElementById('input-qi-forecast-num');
+            const hint = document.getElementById('qi-forecast-hint');
+            
+            slider.disabled = !isChecked;
+            num.disabled = !isChecked;
+            
+            if(!isChecked) {
+                syncForecastToRegression();
+                hint.innerText = "Auto-syncs with Regression End Rate";
+                updateDCA(false);
+            } else {
+                hint.innerText = "Manual Override Active";
+            }
         }
 
         function toggleRegWindow() {
             const isChecked = document.getElementById('check-reg-window').checked;
             document.getElementById('reg-window-container').style.display = isChecked ? 'block' : 'none';
-            updateDCA(false);
+            if (isChecked) {
+                updateRegressionUI();
+            } else {
+                syncForecastToRegression();
+                updateDCA(false);
+            }
         }
 
         function updateRegressionUI() {
@@ -852,6 +924,16 @@
             
             document.getElementById('reg-start-date').innerText = historyData[validStart]?.date.toLocaleDateString() || "-";
             document.getElementById('reg-end-date').innerText = historyData[validEnd]?.date.toLocaleDateString() || "-";
+            
+            if (document.getElementById('check-reg-window').checked && historyData[validStart] && historyData[validEnd]) {
+                 const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
+                 
+                 const q_val_start = historyData[validStart].q * factor;
+                 document.getElementById('input-qi').value = q_val_start;
+                 document.getElementById('input-qi-num').value = parseFloat(q_val_start.toFixed(2));
+                 
+                 syncForecastToRegression();
+            }
             updateDCA(false); 
         }
 
@@ -892,12 +974,12 @@
 
         function updateFluidSettings() {
             const qiSlider = document.getElementById('input-qi');
+            const qiFSlider = document.getElementById('input-qi-forecast');
             const elSlider = document.getElementById('input-el');
             const gasContainer = document.getElementById('gasUnitContainer');
             const uploadLabel = document.getElementById('label-upload-rate');
             const pasteLabel = document.getElementById('hint-paste-format');
             
-            // Get current gas unit from DOM if updated
             const currentGasUnit = document.querySelector('input[name="gasUnit"]:checked')?.value || 'mmscfd';
             let rateUnit = 'BOPD';
             if(fluidType === 'gas') {
@@ -905,26 +987,33 @@
             }
 
             if (fluidType === 'oil') {
-                qiSlider.min = 10; qiSlider.max = 5000; qiSlider.step = 1; 
+                qiSlider.min = 10; qiSlider.max = 5000; qiSlider.step = 1;
+                qiFSlider.min = 10; qiFSlider.max = 5000; qiFSlider.step = 1;
+
                 if(parseFloat(qiSlider.value) > 5000) qiSlider.value = 1000;
+                
                 elSlider.max = 500; elSlider.step = 1;
                 updateUnitLabels('BOPD', 'MBO', 'Bbl');
                 
                 gasContainer.style.display = 'none';
                 uploadLabel.innerText = "Oil Rate (BOPD)";
-                if(pasteLabel) pasteLabel.innerHTML = 'Format: <code>Date [tab] FTHP (psi) [tab] Rate (BOPD)</code>';
+                if(pasteLabel) pasteLabel.innerHTML = 'Format: <code>Date [tab] Rate (BOPD) [tab] Choke</code>';
             } else {
                 qiSlider.min = 0.1; qiSlider.max = 100; qiSlider.step = 0.1;
+                qiFSlider.min = 0.1; qiFSlider.max = 100; qiFSlider.step = 0.1;
+
                 if(parseFloat(qiSlider.value) > 100) qiSlider.value = 10;
+
                 elSlider.max = 10; elSlider.step = 0.01;
                 updateUnitLabels('MMscfd', 'Bscf', 'MMscf');
                 
                 gasContainer.style.display = 'block';
                 uploadLabel.innerText = `Gas Rate (${rateUnit})`;
-                if(pasteLabel) pasteLabel.innerHTML = `Format: <code>Date [tab] FTHP (psi) [tab] Rate (${rateUnit})</code>`;
+                if(pasteLabel) pasteLabel.innerHTML = `Format: <code>Date [tab] Rate (${rateUnit}) [tab] Choke</code>`;
             }
-            ['qi', 'di', 'b', 'months', 'el'].forEach(id => {
-                document.getElementById(`input-${id}-num`).value = document.getElementById(`input-${id}`).value;
+            ['qi', 'di', 'b', 'months', 'el', 'qi-forecast'].forEach(id => {
+                const el = document.getElementById(`input-${id}-num`);
+                if(el) el.value = document.getElementById(`input-${id}`).value;
             });
         }
 
@@ -932,7 +1021,7 @@
             document.querySelectorAll('.unit-rate').forEach(el => el.innerText = rate);
             document.querySelectorAll('.unit-vol').forEach(el => el.innerText = volBig);
             document.querySelectorAll('.unit-vol-small').forEach(el => el.innerText = volSmall);
-            document.getElementById('unit-qi').innerText = rate;
+            document.querySelectorAll('.unit-qi').forEach(el => el.innerText = rate);
             document.getElementById('unit-el').innerText = rate;
         }
 
@@ -957,10 +1046,27 @@
             const startDateInput = document.getElementById('input-date-start').valueAsDate || new Date();
             const Di_m = (Di_pct_yr / 100) / 12;
 
+            // DETERMINE TIME OFFSET IF REGRESSION WINDOW IS ACTIVE
+            const useWindow = document.getElementById('check-reg-window').checked;
+            let t_offset_fit = 0;
+            let startIndexForFit = 0; 
+            let endIndexForFit = historyData.length - 1; 
+
+            if (useWindow && historyData.length > 0) {
+                const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
+                const regEndIdx = parseInt(document.getElementById('input-reg-end').value);
+                
+                if (historyData[regStartIdx]) {
+                    t_offset_fit = historyData[regStartIdx].t_months;
+                    startIndexForFit = regStartIdx;
+                }
+                if (historyData[regEndIdx]) {
+                    endIndexForFit = regEndIdx; 
+                }
+            }
+
             let histCum = 0;
             const fitLine = [];
-            
-            // Prepare Data with Unit Factor
             const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
 
             if (historyData.length > 0) {
@@ -975,20 +1081,28 @@
 
                      const val = historyData[i].q * factor;
                      const vol = val * days; 
-                     histCum += vol;
+                     histCum += vol; 
 
-                     const t = historyData[i].t_months;
-                     let q_model = 0;
-                     if(b === 0) q_model = qi * Math.exp(-Di_m * t);
-                     else q_model = qi / Math.pow((1 + b * Di_m * t), (1/b));
-                     fitLine.push({ t: t, q: q_model, date: historyData[i].date });
+                     // MATCH LINE CALCULATION (Uses qi)
+                     if (i >= startIndexForFit && i <= endIndexForFit) {
+                         const t = historyData[i].t_months;
+                         const t_eff = t - t_offset_fit;
+                         let q_model = 0;
+                         if (b === 0) {
+                             q_model = qi * Math.exp(-Di_m * t_eff);
+                         } else {
+                             const base = 1 + b * Di_m * t_eff;
+                             if (base > 0) {
+                                 q_model = qi / Math.pow(base, (1/b));
+                             } else {
+                                 q_model = null; 
+                             }
+                         }
+                         if (q_model !== null) {
+                            fitLine.push({ t: t, q: q_model, date: historyData[i].date });
+                         }
+                     }
                 }
-            }
-
-            let t_offset = 0;
-            if(historyData.length > 0) {
-                const startHist = historyData[0].date;
-                t_offset = (startDateInput - startHist) / (1000 * 60 * 60 * 24 * 30.44);
             }
 
             const forecastLine = []; 
@@ -996,21 +1110,42 @@
             let remReserves = 0;
             let eolDate = "-";
             
-            // Forecast Generation
+            // Forecast Calculation
+            let t_forecast_start_relative_to_hist = 0;
+            if(historyData.length > 0) {
+                const startHist = historyData[0].date;
+                t_forecast_start_relative_to_hist = (startDateInput - startHist) / (1000 * 60 * 60 * 24 * 30.44);
+            }
+
+            // USE FORECAST QI (Either Auto-synced or Manual)
+            const qi_forecast = parseFloat(document.getElementById('input-qi-forecast').value);
+
             for(let m = 0; m <= forecastMonthsSlider; m++) {
-                const t = t_offset + m;
+                
+                // Forecast calculation uses qi_forecast as starting point (t=0)
+                const t_forecast_eff = m; 
+                
                 let q_calc = 0;
-                const t_safe = Math.max(0, t);
-                if(b === 0) q_calc = qi * Math.exp(-Di_m * t_safe);
-                else q_calc = qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
+                
+                if (b === 0) {
+                     q_calc = qi_forecast * Math.exp(-Di_m * t_forecast_eff);
+                } else {
+                     const base = 1 + b * Di_m * t_forecast_eff;
+                     if (base > 0) {
+                        q_calc = qi_forecast / Math.pow(base, (1/b));
+                     } else {
+                        q_calc = 0;
+                     }
+                }
+                
                 if(q_calc < q_el) q_calc = 0; 
 
                 const currentD = new Date(startDateInput);
                 currentD.setMonth(startDateInput.getMonth() + m);
-                forecastLine.push({ t: t, q: q_calc, date: currentD });
+                forecastLine.push({ q: q_calc, date: currentD });
             }
 
-            // Table
+            // Table Generation
             let cumForecast = 0;
             let m = 0;
             let productionActive = true;
@@ -1018,9 +1153,14 @@
             if(tableView === 'year') {
                 let yearVol = 0; let monthsInYear = 0; let yearCount = 1;
                 while(productionActive && m < 1200) {
-                    const t = t_offset + m;
-                    const t_safe = Math.max(0, t);
-                    let q = (b === 0) ? qi * Math.exp(-Di_m * t_safe) : qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
+                    const t_forecast_eff = m;
+                    let q = 0;
+                    if(b === 0) q = qi_forecast * Math.exp(-Di_m * t_forecast_eff);
+                    else {
+                        const base = 1 + b * Di_m * t_forecast_eff;
+                        if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
+                    }
+
                     if(q < q_el) {
                         productionActive = false; q = 0;
                         const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
@@ -1042,9 +1182,13 @@
                 }
             } else if(tableView === 'month') {
                 while(productionActive && m < 1200) {
-                    const t = t_offset + m;
-                    const t_safe = Math.max(0, t);
-                    let q = (b === 0) ? qi * Math.exp(-Di_m * t_safe) : qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
+                    const t_forecast_eff = m;
+                    let q = 0;
+                    if(b === 0) q = qi_forecast * Math.exp(-Di_m * t_forecast_eff);
+                    else {
+                        const base = 1 + b * Di_m * t_forecast_eff;
+                        if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
+                    }
                     if(q < q_el) {
                         productionActive = false; q = 0;
                         const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
@@ -1058,9 +1202,13 @@
             } else { // Daily
                 let d_count = 0;
                 while(productionActive && d_count < 3650) { 
-                     const t_days = (t_offset * 30.44) + d_count;
-                     const t_safe = Math.max(0, t_days / 30.44);
-                     let q = (b === 0) ? qi * Math.exp(-Di_m * t_safe) : qi / Math.pow((1 + b * Di_m * t_safe), (1/b));
+                     const t_forecast_eff = d_count / 30.44;
+                     let q = 0;
+                     if(b === 0) q = qi_forecast * Math.exp(-Di_m * t_forecast_eff);
+                     else {
+                         const base = 1 + b * Di_m * t_forecast_eff;
+                         if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
+                     }
                      if(q < q_el) { 
                          productionActive = false; q = 0;
                          const d = new Date(startDateInput); d.setDate(startDateInput.getDate() + d_count); eolDate = d.toLocaleDateString();
@@ -1082,11 +1230,11 @@
             
             const useWindow = document.getElementById('check-reg-window').checked;
             let regressionData = [];
-            
-            // Factor for regression
             const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
             
-            // Create regression dataset with APPLIED factor
+            let finalT = 0;
+            
+            // BASE DATA
             const regSource = historyData.map(d => ({
                 t_months: d.t_months,
                 q: d.q * factor
@@ -1096,24 +1244,35 @@
                 const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
                 const regEndIdx = parseInt(document.getElementById('input-reg-end').value);
                 if(regStartIdx >= regEndIdx) { alert("Invalid Window."); return; }
+                
                 regressionData = regSource.slice(regStartIdx, regEndIdx + 1);
+                
+                const t_ref = regressionData[0].t_months;
+                regressionData.forEach(d => {
+                    d.t_months = d.t_months - t_ref;
+                });
+                
+                finalT = historyData[regEndIdx].t_months - historyData[regStartIdx].t_months;
+                
             } else {
                 regressionData = regSource;
+                finalT = historyData[historyData.length-1].t_months - historyData[0].t_months;
             }
 
             document.getElementById('loadingOverlay').style.display = 'flex';
             await new Promise(r => setTimeout(r, 100));
 
             let bestSSE = Infinity;
-            const qiMin = parseFloat(document.getElementById('input-qi').min);
-            const qiMax = parseFloat(document.getElementById('input-qi').max);
             const bMax = 1.0; 
-            let bestParams = { qi: 1000, di: 20, b: 0.5 };
+            // DEFAULT B = 0 for regression init
+            let bestParams = { qi: 1000, di: 20, b: 0 };
+            
             let currentParams = {
-                qi: parseFloat(document.getElementById('input-qi').value),
+                qi: regressionData[0].q, 
                 di: parseFloat(document.getElementById('input-di').value),
                 b: parseFloat(document.getElementById('input-b').value)
             };
+            
             const iterations = 2000;
             let temp = 100;
             
@@ -1123,7 +1282,7 @@
                     di: currentParams.di + (Math.random()-0.5) * temp * 0.5,
                     b: currentParams.b + (Math.random()-0.5) * temp * 0.05
                 };
-                nextParams.qi = Math.max(qiMin, Math.min(qiMax, nextParams.qi));
+                nextParams.qi = Math.max(0.1, nextParams.qi);
                 nextParams.di = Math.max(1, Math.min(300, nextParams.di));
                 nextParams.b = Math.max(0, Math.min(bMax, nextParams.b));
 
@@ -1136,21 +1295,52 @@
                 temp *= 0.995;
             }
 
+            // Apply Regression Results to Match Parameters
             document.getElementById('input-qi').value = bestParams.qi;
             document.getElementById('input-di').value = bestParams.di;
             document.getElementById('input-b').value = bestParams.b;
-            ['qi', 'di', 'b'].forEach(id => { document.getElementById(`input-${id}-num`).value = document.getElementById(`input-${id}`).value; });
+
+            // CALCULATE FITTED END RATE
+            const Di_m_best = (bestParams.di / 100) / 12;
+            let q_final_fit = 0;
+            if (bestParams.b === 0) {
+                 q_final_fit = bestParams.qi * Math.exp(-Di_m_best * finalT);
+            } else {
+                 const base = 1 + bestParams.b * Di_m_best * finalT;
+                 if(base > 0) q_final_fit = bestParams.qi / Math.pow(base, (1/bestParams.b));
+            }
+            
+            lastCalculatedEndRate = q_final_fit;
+
+            if(!document.getElementById('check-override-forecast-qi').checked) {
+                 document.getElementById('input-qi-forecast').value = q_final_fit;
+                 document.getElementById('input-qi-forecast-num').value = q_final_fit.toFixed(2);
+            }
+
+            ['qi', 'di', 'b'].forEach(id => { 
+                document.getElementById(`input-${id}-num`).value = parseFloat(document.getElementById(`input-${id}`).value).toFixed(2); 
+            });
+            
             updateDCA(false);
             document.getElementById('loadingOverlay').style.display = 'none';
         }
 
+        // ... rest of the helper functions remain similar but verify no references to old toggle ...
         function calculateSSE(p, dataSubset) {
             let sse = 0;
             const Di_m = (p.di / 100) / 12;
             for(let i=0; i<dataSubset.length; i++) {
-                const t = dataSubset[i].t_months;
+                const t = dataSubset[i].t_months; // Already normalized if useWindow is true
                 const actual = dataSubset[i].q;
-                let model = (Math.abs(p.b) < 0.001) ? p.qi * Math.exp(-Di_m * t) : p.qi / Math.pow((1 + p.b * Di_m * t), (1/p.b));
+                let model = 0;
+                
+                if (p.b === 0) {
+                     model = p.qi * Math.exp(-Di_m * t);
+                } else {
+                     const base = 1 + p.b * Di_m * t;
+                     if(base > 0) model = p.qi / Math.pow(base, (1/p.b));
+                     else model = 999999; // Penalty
+                }
                 sse += Math.pow(actual - model, 2);
             }
             return sse;
@@ -1159,7 +1349,6 @@
         function copyTable() {
             if(!currentForecastData || currentForecastData.length === 0) return;
             
-            // Determine units
             const unitRate = fluidType === 'gas' ? 'MMscfd' : 'BOPD';
             const unitVol = fluidType === 'gas' ? 'MMscf' : 'Bbl';
             const unitCum = fluidType === 'gas' ? 'BSCF' : 'MBO';
@@ -1168,7 +1357,6 @@
             
             currentForecastData.forEach(row => {
                 const dateStr = row.isYearly ? row.label : row.date.toISOString().split('T')[0];
-                // Divide cum by 1000 to convert Bbl->MBO or MMscf->Bscf
                 const cumVal = row.cum / 1000;
                 text += `${dateStr}\t${row.q.toFixed(2)}\t${row.vol.toFixed(2)}\t${cumVal.toFixed(2)}\n`;
             });
@@ -1199,7 +1387,6 @@
             
             currentForecastData.forEach(row => {
                 const dateStr = row.isYearly ? row.label : row.date.toISOString().split('T')[0];
-                // Divide cum by 1000 to convert Bbl->MBO or MMscf->Bscf
                 const cumVal = row.cum / 1000;
                 const rowStr = `${dateStr},${row.q.toFixed(2)},${row.vol.toFixed(2)},${cumVal.toFixed(2)}`;
                 csvContent += rowStr + "\n";
@@ -1247,31 +1434,30 @@
 
             // Plot
             const isLog = document.getElementById('logScaleToggle').checked;
-            const showFTHP = document.getElementById('showFTHPToggle').checked;
+            const showChoke = document.getElementById('showChokeToggle').checked;
             const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
             
-            // Primary Rate Trace
             const traceHist = {
                 x: historyData.map(d => d.date), y: historyData.map(d => d.q * factor),
                 mode: 'markers', type: 'scatter', name: `History (${fluidType})`,
                 marker: { color: '#333', size: 5, symbol: 'circle' }
             };
 
-            // FTHP Trace
-            const fthpX = [], fthpY = [];
-            if(showFTHP) {
-                historyData.forEach(d => { if(d.fthp > 0) { fthpX.push(d.date); fthpY.push(d.fthp); } });
+            // PLOT CHOKE SIZE
+            const chokeX = [], chokeY = [];
+            if(showChoke) {
+                historyData.forEach(d => { if(d.choke > 0) { chokeX.push(d.date); chokeY.push(d.choke); } });
             }
-            const traceFthp = {
-                x: fthpX, y: fthpY,
-                mode: 'lines', type: 'scatter', name: 'FTHP (psi)',
+            const traceChoke = {
+                x: chokeX, y: chokeY,
+                mode: 'lines', type: 'scatter', name: 'Choke Size',
                 yaxis: 'y2', line: { color: 'green', width: 1.5, dash: 'dot' }
             };
 
             const traceFit = {
                 x: res.fitLine.map(d => d.date), y: res.fitLine.map(d => d.q),
-                mode: 'lines', type: 'scatter', name: 'Fit',
-                line: { color: '#0083B8', width: 2, dash: 'dash' }
+                mode: 'lines', type: 'scatter', name: 'Historical Match',
+                line: { color: '#0083B8', width: 2.5, dash: 'dash' }
             };
             
             const fcstX = [], fcstY = [];
@@ -1294,7 +1480,6 @@
                 line: { color: 'orange', dash: 'dot', width: 1 }
             };
 
-             // Regression Window Shape
             const useWindow = document.getElementById('check-reg-window').checked;
             let shapes = [];
             if (useWindow) {
@@ -1308,19 +1493,12 @@
                 }
             }
 
-            // Traces array
             const traces = [traceHist, traceFit, traceFcst, traceLimit];
-            if(showFTHP) {
-                traces.push(traceFthp);
+            if(showChoke) {
+                traces.push(traceChoke);
             }
 
             let plotTitle = "Production Rate vs Date";
-            if(wellName.trim() !== "" || zoneName.trim() !== "") {
-               const parts = [];
-               if(wellName.trim()) parts.push(wellName);
-               if(zoneName.trim()) parts.push(zoneName);
-               plotTitle += `<br><span style="font-size: 14px; color: #555;">${parts.join(" | ")}</span>`;
-            }
 
             const layout = {
                 title: {
@@ -1330,8 +1508,8 @@
                 font: { family: '"Source Sans Pro", sans-serif' },
                 xaxis: { title: 'Date' },
                 yaxis: { title: `Rate (${fluidType === 'gas' ? 'MMscfd' : 'BOPD'})`, type: isLog ? 'log' : 'linear' },
-                yaxis2: showFTHP ? { 
-                    title: 'FTHP (psi)', 
+                yaxis2: showChoke ? { 
+                    title: 'Choke Size', 
                     overlaying: 'y', 
                     side: 'right', 
                     showgrid: false, 
@@ -1339,7 +1517,7 @@
                     tickfont: {color:'green'} 
                 } : { visible: false },
                 paper_bgcolor: 'white', plot_bgcolor: 'white',
-                margin: { t: 60, r: showFTHP ? 50 : 20, l: 60, b: 40 },
+                margin: { t: 60, r: showChoke ? 50 : 20, l: 60, b: 40 },
                 legend: { x: 1.1, xanchor: 'left', y: 1 },
                 shapes: shapes
             };
