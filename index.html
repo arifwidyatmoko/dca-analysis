@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-   
+        /* STREAMLIT-LIKE STYLING */
         :root {
             --primary-color: #ff4b4b;
             --secondary-color: #0083B8;
@@ -89,11 +89,6 @@
         /* Disabled Input Style */
         .val-input:disabled { background-color: #f0f0f0; color: #888; border-color: #eee; }
         input[type=range]:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        /* HIDE NUMBER INPUT SPINNERS (ARROWS) */
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type=number] { -moz-appearance: textfield; }
 
         /* SLIDER STYLING */
         input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; cursor: pointer; }
@@ -239,7 +234,7 @@
         <div class="slider-container">
             <div class="slider-header">
                 <span class="slider-label">Initial Rate, qi (<span class="unit-qi">BOPD</span>)</span>
-                <input type="number" id="input-qi-num" class="val-input" onchange="syncInput('qi', 'num')">
+                <input type="number" id="input-qi-num" class="val-input" step="1" onchange="syncInput('qi', 'num')">
             </div>
             <input type="range" id="input-qi" min="10" max="2000" step="1" oninput="syncInput('qi', 'slider')">
         </div>
@@ -247,7 +242,7 @@
         <div class="slider-container">
             <div class="slider-header">
                 <span class="slider-label">Initial Decline, Di (%/year)</span>
-                <input type="number" id="input-di-num" class="val-input" onchange="syncInput('di', 'num')">
+                <input type="number" id="input-di-num" class="val-input" step="0.5" onchange="syncInput('di', 'num')">
             </div>
             <input type="range" id="input-di" min="1" max="300" step="0.5" value="20" oninput="syncInput('di', 'slider')">
         </div>
@@ -301,7 +296,7 @@
             
             <div class="slider-header">
                 <span class="slider-label" style="color:var(--primary-color);">Forecast Qi (<span class="unit-qi">BOPD</span>)</span>
-                <input type="number" id="input-qi-forecast-num" class="val-input" onchange="syncInput('qi-forecast', 'num')" disabled>
+                <input type="number" id="input-qi-forecast-num" class="val-input" step="1" onchange="syncInput('qi-forecast', 'num')" disabled>
             </div>
             <input type="range" id="input-qi-forecast" min="10" max="2000" step="1" oninput="syncInput('qi-forecast', 'slider')" disabled>
             <div class="text-[10px] text-gray-400 mt-1 italic" id="qi-forecast-hint">Auto-syncs with Regression End Rate</div>
@@ -321,7 +316,7 @@
         <div class="slider-container">
             <div class="slider-header">
                 <span class="slider-label">Forecast Duration (Months)</span>
-                <input type="number" id="input-months-num" class="val-input" onchange="syncInput('months', 'num')">
+                <input type="number" id="input-months-num" class="val-input" step="1" onchange="syncInput('months', 'num')">
             </div>
             <input type="range" id="input-months" min="1" max="600" step="1" value="120" oninput="syncInput('months', 'slider')">
         </div>
@@ -329,7 +324,7 @@
         <div class="slider-container">
             <div class="slider-header">
                 <span class="slider-label">Economic Limit (<span id="unit-el">BOPD</span>)</span>
-                <input type="number" id="input-el-num" class="val-input" onchange="syncInput('el', 'num')">
+                <input type="number" id="input-el-num" class="val-input" step="1" onchange="syncInput('el', 'num')">
             </div>
             <input type="range" id="input-el" min="0" max="500" step="1" value="50" oninput="syncInput('el', 'slider')">
         </div>
@@ -357,7 +352,8 @@
         <div id="dcaChart" style="width: 100%; height: 550px; margin-bottom: 2rem; border: 1px solid #eee; border-radius: 8px;"></div>
 
         <!-- Results Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <!-- MODIFIED GRID to 5 columns on large screens to fit the new card -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
             <div class="bg-white border p-4 rounded-lg shadow-sm">
                 <div class="text-xs text-gray-500">EUR (Est. Ult. Recovery)</div>
                 <div class="text-2xl font-bold text-red-500">
@@ -381,6 +377,14 @@
                 <div class="text-lg font-bold text-gray-800">
                     <span id="res-eol">-</span>
                 </div>
+            </div>
+            <!-- NEW CARD: Decline Info -->
+            <div class="bg-white border p-4 rounded-lg shadow-sm">
+                <div class="text-xs text-gray-500">Decline Info</div>
+                <div class="text-2xl font-bold text-gray-800">
+                    <span id="res-di">20</span><span class="text-sm">%</span>
+                </div>
+                <div class="text-xs text-gray-500">b = <span id="res-b">0.5</span></div>
             </div>
         </div>
 
@@ -1051,6 +1055,10 @@
             let t_offset_fit = 0;
             let startIndexForFit = 0; 
             let endIndexForFit = historyData.length - 1; 
+            
+            // 1. IDENTIFY REGRESSION START TIME (t=0 for the Fitted Curve)
+            // Parameter qi dan Di di slider berlaku pada titik waktu ini
+            let t_reg_start_months = 0; 
 
             if (useWindow && historyData.length > 0) {
                 const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
@@ -1058,11 +1066,15 @@
                 
                 if (historyData[regStartIdx]) {
                     t_offset_fit = historyData[regStartIdx].t_months;
+                    t_reg_start_months = historyData[regStartIdx].t_months;
                     startIndexForFit = regStartIdx;
                 }
                 if (historyData[regEndIdx]) {
                     endIndexForFit = regEndIdx; 
                 }
+            } else if (historyData.length > 0) {
+                // Jika tidak pakai window, regresi mulai dari data pertama
+                t_reg_start_months = historyData[0].t_months;
             }
 
             let histCum = 0;
@@ -1116,6 +1128,22 @@
                 const startHist = historyData[0].date;
                 t_forecast_start_relative_to_hist = (startDateInput - startHist) / (1000 * 60 * 60 * 24 * 30.44);
             }
+            
+            // 2. HITUNG EFFECTIVE DECLINE PADA SAAT FORECAST DIMULAI
+            // Hitung selisih waktu dari "Start Regresi" ke "Start Forecast"
+            const t_elapsed_since_reg_start = t_forecast_start_relative_to_hist - t_reg_start_months;
+            
+            // Hitung decline rate baru (D_eff) pada titik t_elapsed
+            // Rumus: D(t) = Di / (1 + b * Di * t)
+            let Di_m_forecast = Di_m;
+            if (b > 0) {
+                const denom = 1 + b * Di_m * t_elapsed_since_reg_start;
+                // Pastikan denominator aman (biasanya > 1 karena waktu positif)
+                if (denom > 0) {
+                    Di_m_forecast = Di_m / denom;
+                }
+            }
+            // Jika b=0 (Exponential), Di konstan, jadi Di_m_forecast tetap Di_m
 
             // USE FORECAST QI (Either Auto-synced or Manual)
             const qi_forecast = parseFloat(document.getElementById('input-qi-forecast').value);
@@ -1127,10 +1155,11 @@
                 
                 let q_calc = 0;
                 
+                // GUNAKAN Di_m_forecast (Decline Efektif) BUKAN Di_m (Decline Awal)
                 if (b === 0) {
-                     q_calc = qi_forecast * Math.exp(-Di_m * t_forecast_eff);
+                     q_calc = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
                 } else {
-                     const base = 1 + b * Di_m * t_forecast_eff;
+                     const base = 1 + b * Di_m_forecast * t_forecast_eff;
                      if (base > 0) {
                         q_calc = qi_forecast / Math.pow(base, (1/b));
                      } else {
@@ -1155,9 +1184,11 @@
                 while(productionActive && m < 1200) {
                     const t_forecast_eff = m;
                     let q = 0;
-                    if(b === 0) q = qi_forecast * Math.exp(-Di_m * t_forecast_eff);
+                    
+                    // Same logic for table calculation: Use Di_m_forecast
+                    if(b === 0) q = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
                     else {
-                        const base = 1 + b * Di_m * t_forecast_eff;
+                        const base = 1 + b * Di_m_forecast * t_forecast_eff;
                         if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
                     }
 
@@ -1184,9 +1215,10 @@
                 while(productionActive && m < 1200) {
                     const t_forecast_eff = m;
                     let q = 0;
-                    if(b === 0) q = qi_forecast * Math.exp(-Di_m * t_forecast_eff);
+                    // Use Di_m_forecast
+                    if(b === 0) q = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
                     else {
-                        const base = 1 + b * Di_m * t_forecast_eff;
+                        const base = 1 + b * Di_m_forecast * t_forecast_eff;
                         if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
                     }
                     if(q < q_el) {
@@ -1204,9 +1236,10 @@
                 while(productionActive && d_count < 3650) { 
                      const t_forecast_eff = d_count / 30.44;
                      let q = 0;
-                     if(b === 0) q = qi_forecast * Math.exp(-Di_m * t_forecast_eff);
+                     // Use Di_m_forecast
+                     if(b === 0) q = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
                      else {
-                         const base = 1 + b * Di_m * t_forecast_eff;
+                         const base = 1 + b * Di_m_forecast * t_forecast_eff;
                          if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
                      }
                      if(q < q_el) { 
@@ -1409,6 +1442,10 @@
             document.getElementById('res-rem').innerText = (res.remReserves/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
             document.getElementById('res-cum').innerText = (res.histCum/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
             document.getElementById('res-eol').innerText = res.eolDate;
+
+            // Update New Card (Decline Info)
+            document.getElementById('res-di').innerText = document.getElementById('input-di').value;
+            document.getElementById('res-b').innerText = document.getElementById('input-b').value;
 
             // Table Render
             const tbody = document.getElementById('forecastTableBody');
