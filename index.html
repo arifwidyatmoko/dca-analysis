@@ -329,6 +329,33 @@
             <input type="range" id="input-el" min="0" max="500" step="1" value="50" oninput="syncInput('el', 'slider')">
         </div>
 
+        <!-- NEW: CALC METHOD AT BOTTOM -->
+        <hr style="border: 0; border-top: 1px solid #e0e0e0; margin: 1.5rem 0;">
+        
+        <div class="mb-6 p-3 bg-gray-50 rounded border border-gray-200">
+             <label class="slider-label" style="font-size:13px; display:block; margin-bottom:0.5rem; color:var(--text-color);">Cumulative Calculation Method</label>
+             
+             <!-- OPTION 1: TIME STEP -->
+             <div class="mb-3">
+                 <label class="st-radio-option" style="font-size: 13px; margin-bottom: 2px;">
+                    <input type="radio" name="calcMethod" value="time" checked onchange="updateDCA(false)"> <b>Time-Step (Recommended)</b>
+                 </label>
+                 <div class="text-[11px] text-gray-500 ml-6 leading-tight">
+                    Uses physics/calendar duration. Calculates <code>Rate × Days</code> in month. Accurate for monthly data or data with gaps.
+                 </div>
+             </div>
+
+             <!-- OPTION 2: SIMPLE SUM -->
+             <div>
+                 <label class="st-radio-option" style="font-size: 13px; margin-bottom: 2px;">
+                    <input type="radio" name="calcMethod" value="sum" onchange="updateDCA(false)"> <b>Simple Sum (Excel-like)</b>
+                 </label>
+                 <div class="text-[11px] text-gray-500 ml-6 leading-tight">
+                    Directly sums the rate column. Assumes <code>1 Row = 1 Day</code>. Use only for complete daily data to match manual Excel sums.
+                 </div>
+             </div>
+        </div>
+
     </div>
 
     <!-- MAIN CONTENT -->
@@ -434,6 +461,7 @@
         let currentForecastData = []; 
         let gasInputUnit = 'mmscfd'; // 'mscfd' or 'mmscfd'
         let lastCalculatedEndRate = 0; // To store last fit rate
+        let currentRawPaste = ""; // Store raw paste to re-parse on format change
 
         // Init Input Tabs
         function switchInputTab(tabName) {
@@ -525,13 +553,9 @@
                         }
                     } else if(section === "HISTORY") {
                         const parts = cleanLine.split(",");
-                        // Handling CSV loading for history
-                        // Legacy might be Date,FTHP,Rate. New is Date,Rate,Choke
-                        // We will follow the new parser logic logic `parseRawLine` or simpler here
                         if(parts.length >= 2 && parts[0] !== "Date") {
                              const d = parseDate(parts[0]);
                              if(d && !isNaN(d.getTime())) {
-                                 // Assume NEW format: Date, Rate, Choke
                                  let rate = parseFloat(parts[1]);
                                  let choke = 0;
                                  if(parts.length >= 3) choke = parseFloat(parts[2]);
@@ -563,7 +587,6 @@
                     dateStart: state.params.dateStart,
                     timeShift: state.params.timeShift
                 };
-                // Map old JSON fields if necessary
                 const newHistory = (state.historyData || []).map(d => ({ 
                     date: new Date(d.date), 
                     q: d.q,
@@ -664,8 +687,6 @@
         function parseDate(dateStr) {
             if(!dateStr) return null;
             let cleanStr = dateStr.trim();
-            
-            // Replace common separators with /
             cleanStr = cleanStr.replace(/[\-\s]/g, '/');
             const parts = cleanStr.split('/');
 
@@ -674,17 +695,13 @@
                 let monthStr = parts[1];
                 let year = parseInt(parts[2]);
 
-                // Handle 2 digit year (e.g. 23 -> 2023)
                 if (year < 100) year += 2000;
 
-                // Handle Month
                 let monthIndex = -1;
                 
-                // If month is a number (e.g. 01, 12)
                 if(!isNaN(monthStr)) {
                     monthIndex = parseInt(monthStr) - 1;
                 } else {
-                    // Try to parse text month (English & Indonesian short/long)
                     const months = {
                         "jan":0, "feb":1, "mar":2, "apr":3, "may":4, "mei":4, "jun":5, "jul":6, "aug":7, "agu":7, "agt":7, "sep":8, "oct":9, "okt":9, "nov":10, "dec":11, "des":11,
                         "januari":0, "februari":1, "maret":2, "april":3, "juni":5, "juli":6, "agustus":7, "september":8, "oktober":9, "november":10, "desember":11
@@ -697,29 +714,45 @@
                 }
 
                 if (monthIndex >= 0 && monthIndex < 12 && day > 0 && day <= 31) {
-                    const d = new Date(year, monthIndex, day);
+                    const d = new Date(year, monthIndex, day, 12, 0, 0);
                     if(!isNaN(d.getTime())) return d;
                 }
             }
-
-            // Fallback
             const d = new Date(dateStr);
             return isNaN(d.getTime()) ? null : d;
         }
 
+        // --- STANDARD US PARSER (FORCE US FORMAT) ---
+        function parseLocalFloat(str) {
+            if(!str) return NaN;
+            str = str.trim().replace(/^"|"$/g, '');
+            if(str === "") return NaN;
+
+            // Default behavior: US Format
+            // Comma is thousands separator -> Remove it
+            // Dot is decimal -> Keep it
+            let cleanStr = str.replace(/,/g, '');
+            return parseFloat(cleanStr);
+        }
+
         function parseRawLine(line) {
-            const cols = line.trim().split(/[\t,]+/);
+            let cols;
+            if(line.indexOf('\t') > -1) {
+                cols = line.trim().split('\t');
+            } else {
+                cols = line.trim().split(/[\t,]+/); 
+            }
+            
             if(cols.length < 2) return null;
 
             const d = parseDate(cols[0]);
             if(!d || isNaN(d.getTime())) return null;
 
-            // UPDATED PARSING: Date, Rate, Choke
-            let rate = parseFloat(cols[1]);
-            let choke = 0;
+            let rate = parseLocalFloat(cols[1]);
             
+            let choke = 0;
             if(cols.length >= 3) {
-                choke = parseFloat(cols[2]);
+                choke = parseLocalFloat(cols[2]);
                 if(isNaN(choke)) choke = 0;
             }
             
@@ -733,11 +766,12 @@
         }
 
         function loadExampleData() {
+            // ... load example code ...
             const data = [];
             const start = new Date();
             start.setMonth(start.getMonth() - 24);
             let q = fluidType === 'oil' ? 1000 : 5000; 
-            let choke = 32; // Default starting choke
+            let choke = 32; 
 
             if(fluidType === 'gas') {
                 q = 5.0;
@@ -750,7 +784,6 @@
                 d.setMonth(start.getMonth() + i);
                 
                 q = q * Math.exp(-0.02) * (0.95 + Math.random()*0.1);
-                // Simulate step choke change
                 if (i % 6 === 0) choke += 2;
 
                 data.push({
@@ -770,17 +803,15 @@
                 document.getElementById('input-time-shift').value = 0;
             }
             
-            // Set default b=0 for new example load as well
             document.getElementById('input-b').value = 0;
             document.getElementById('input-b-num').value = 0;
 
-            // Initial sync: Use syncForecastToRegression to ensure consistency
             syncForecastToRegression();
-
             updateDCA(false);
         }
 
         function handleHistoryPaste(text) {
+            currentRawPaste = text; // Store for re-parsing
             if(!text) return;
             const rows = text.trim().split(/\r?\n/);
             const newData = [];
@@ -803,31 +834,14 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 const text = e.target.result;
-                const rows = text.trim().split(/\r?\n/);
-                const newData = [];
-                let startIdx = 0;
-                // Simple heuristic to skip header if first col not date
-                if(rows.length > 0) {
-                    const firstCell = rows[0].split(/[\t,]+/)[0];
-                    if(isNaN(Date.parse(firstCell)) && !parseDate(firstCell)) startIdx = 1;
-                }
-                
-                for(let i = startIdx; i < rows.length; i++) {
-                    const item = parseRawLine(rows[i]);
-                    if(item) newData.push(item);
-                }
-                
-                if(newData.length > 0) {
-                    const sorted = newData.sort((a,b) => a.date - b.date);
-                    processHistoryData(sorted);
-                    updateDCA(false);
-                }
+                handleHistoryPaste(text); // Use shared logic
             };
             reader.readAsText(file);
         }
 
         function clearHistory() {
             historyData = [];
+            currentRawPaste = "";
             document.getElementById('historyPasteArea').value = '';
             updateDCA(false);
         }
@@ -839,7 +853,6 @@
             const num = document.getElementById(`input-${id}-num`);
             if (source === 'slider') { num.value = slider.value; } else { slider.value = num.value; }
             
-            // Sync Forecast Qi secara real-time saat parameter regresi manual berubah
             if (['qi', 'di', 'b'].includes(id)) {
                 syncForecastToRegression();
             }
@@ -847,7 +860,6 @@
             updateDCA(false);
         }
 
-        // FUNGSI BARU: Menghitung rate akhir dari regresi saat ini dan mengupdate forecast qi
         function syncForecastToRegression() {
             if(document.getElementById('check-override-forecast-qi').checked) return;
             if(historyData.length === 0) return;
@@ -996,7 +1008,6 @@
             if (fluidType === 'oil') {
                 qiSlider.min = 10; qiSlider.max = 5000; qiSlider.step = 1;
                 qiFSlider.min = 10; qiFSlider.max = 5000; qiFSlider.step = 1;
-
                 if(parseFloat(qiSlider.value) > 5000) qiSlider.value = 1000;
                 
                 elSlider.max = 500; elSlider.step = 1;
@@ -1008,7 +1019,6 @@
             } else {
                 qiSlider.min = 0.1; qiSlider.max = 100; qiSlider.step = 0.1;
                 qiFSlider.min = 0.1; qiFSlider.max = 100; qiFSlider.step = 0.1;
-
                 if(parseFloat(qiSlider.value) > 100) qiSlider.value = 10;
 
                 elSlider.max = 10; elSlider.step = 0.01;
@@ -1043,234 +1053,14 @@
             updateDCA(false);
         }
 
-        // --- CALCULATION ---
-        function calculateDCA() {
-            const qi = parseFloat(document.getElementById('input-qi').value);
-            const Di_pct_yr = parseFloat(document.getElementById('input-di').value);
-            const b = parseFloat(document.getElementById('input-b').value);
-            const forecastMonthsSlider = parseFloat(document.getElementById('input-months').value);
-            const q_el = parseFloat(document.getElementById('input-el').value);
-            const startDateInput = document.getElementById('input-date-start').valueAsDate || new Date();
-            const Di_m = (Di_pct_yr / 100) / 12;
-
-            // DETERMINE TIME OFFSET IF REGRESSION WINDOW IS ACTIVE
-            const useWindow = document.getElementById('check-reg-window').checked;
-            let t_offset_fit = 0;
-            let startIndexForFit = 0; 
-            let endIndexForFit = historyData.length - 1; 
-            
-            // 1. IDENTIFY REGRESSION START TIME (t=0 for the Fitted Curve)
-            // Parameter qi dan Di di slider berlaku pada titik waktu ini
-            let t_reg_start_months = 0; 
-
-            if (useWindow && historyData.length > 0) {
-                const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
-                const regEndIdx = parseInt(document.getElementById('input-reg-end').value);
-                
-                if (historyData[regStartIdx]) {
-                    t_offset_fit = historyData[regStartIdx].t_months;
-                    t_reg_start_months = historyData[regStartIdx].t_months;
-                    startIndexForFit = regStartIdx;
-                }
-                if (historyData[regEndIdx]) {
-                    endIndexForFit = regEndIdx; 
-                }
-            } else if (historyData.length > 0) {
-                // Jika tidak pakai window, regresi mulai dari data pertama
-                t_reg_start_months = historyData[0].t_months;
-            }
-
-            let histCum = 0;
-            const fitLine = [];
-            const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
-
-            if (historyData.length > 0) {
-                for(let i=0; i<historyData.length; i++) {
-                     let days = 0;
-                     if (i < historyData.length - 1) {
-                         days = (historyData[i+1].date - historyData[i].date) / (1000 * 60 * 60 * 24);
-                     } else {
-                         days = (i > 0) ? (historyData[i].date - historyData[i-1].date) / (1000 * 60 * 60 * 24) : 1;
-                     }
-                     if(days <= 0) days = 1; 
-
-                     const val = historyData[i].q * factor;
-                     const vol = val * days; 
-                     histCum += vol; 
-
-                     // MATCH LINE CALCULATION (Uses qi)
-                     if (i >= startIndexForFit && i <= endIndexForFit) {
-                         const t = historyData[i].t_months;
-                         const t_eff = t - t_offset_fit;
-                         let q_model = 0;
-                         if (b === 0) {
-                             q_model = qi * Math.exp(-Di_m * t_eff);
-                         } else {
-                             const base = 1 + b * Di_m * t_eff;
-                             if (base > 0) {
-                                 q_model = qi / Math.pow(base, (1/b));
-                             } else {
-                                 q_model = null; 
-                             }
-                         }
-                         if (q_model !== null) {
-                            fitLine.push({ t: t, q: q_model, date: historyData[i].date });
-                         }
-                     }
-                }
-            }
-
-            const forecastLine = []; 
-            const forecastTableData = []; 
-            let remReserves = 0;
-            let eolDate = "-";
-            
-            // Forecast Calculation
-            let t_forecast_start_relative_to_hist = 0;
-            if(historyData.length > 0) {
-                const startHist = historyData[0].date;
-                t_forecast_start_relative_to_hist = (startDateInput - startHist) / (1000 * 60 * 60 * 24 * 30.44);
-            }
-            
-            // 2. HITUNG EFFECTIVE DECLINE PADA SAAT FORECAST DIMULAI
-            // Hitung selisih waktu dari "Start Regresi" ke "Start Forecast"
-            const t_elapsed_since_reg_start = t_forecast_start_relative_to_hist - t_reg_start_months;
-            
-            // Hitung decline rate baru (D_eff) pada titik t_elapsed
-            // Rumus: D(t) = Di / (1 + b * Di * t)
-            let Di_m_forecast = Di_m;
-            if (b > 0) {
-                const denom = 1 + b * Di_m * t_elapsed_since_reg_start;
-                // Pastikan denominator aman (biasanya > 1 karena waktu positif)
-                if (denom > 0) {
-                    Di_m_forecast = Di_m / denom;
-                }
-            }
-            // Jika b=0 (Exponential), Di konstan, jadi Di_m_forecast tetap Di_m
-
-            // USE FORECAST QI (Either Auto-synced or Manual)
-            const qi_forecast = parseFloat(document.getElementById('input-qi-forecast').value);
-
-            for(let m = 0; m <= forecastMonthsSlider; m++) {
-                
-                // Forecast calculation uses qi_forecast as starting point (t=0)
-                const t_forecast_eff = m; 
-                
-                let q_calc = 0;
-                
-                // GUNAKAN Di_m_forecast (Decline Efektif) BUKAN Di_m (Decline Awal)
-                if (b === 0) {
-                     q_calc = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
-                } else {
-                     const base = 1 + b * Di_m_forecast * t_forecast_eff;
-                     if (base > 0) {
-                        q_calc = qi_forecast / Math.pow(base, (1/b));
-                     } else {
-                        q_calc = 0;
-                     }
-                }
-                
-                if(q_calc < q_el) q_calc = 0; 
-
-                const currentD = new Date(startDateInput);
-                currentD.setMonth(startDateInput.getMonth() + m);
-                forecastLine.push({ q: q_calc, date: currentD });
-            }
-
-            // Table Generation
-            let cumForecast = 0;
-            let m = 0;
-            let productionActive = true;
-            
-            if(tableView === 'year') {
-                let yearVol = 0; let monthsInYear = 0; let yearCount = 1;
-                while(productionActive && m < 1200) {
-                    const t_forecast_eff = m;
-                    let q = 0;
-                    
-                    // Same logic for table calculation: Use Di_m_forecast
-                    if(b === 0) q = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
-                    else {
-                        const base = 1 + b * Di_m_forecast * t_forecast_eff;
-                        if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
-                    }
-
-                    if(q < q_el) {
-                        productionActive = false; q = 0;
-                        const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
-                    } else {
-                        const vol = q * 30.44; yearVol += vol; remReserves += vol; cumForecast += vol; monthsInYear++;
-                        if ((m + 1) % 12 === 0) {
-                            forecastTableData.push({ 
-                                label: `Year ${yearCount}`, q: yearVol/365.25, vol: yearVol, cum: cumForecast, isYearly: true
-                            });
-                            yearVol = 0; monthsInYear = 0; yearCount++;
-                        }
-                    }
-                    m++;
-                }
-                if(yearVol > 0) {
-                   forecastTableData.push({ 
-                       label: `Year ${yearCount}`, q: yearVol/(monthsInYear*30.44), vol: yearVol, cum: cumForecast, isYearly: true 
-                   });
-                }
-            } else if(tableView === 'month') {
-                while(productionActive && m < 1200) {
-                    const t_forecast_eff = m;
-                    let q = 0;
-                    // Use Di_m_forecast
-                    if(b === 0) q = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
-                    else {
-                        const base = 1 + b * Di_m_forecast * t_forecast_eff;
-                        if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
-                    }
-                    if(q < q_el) {
-                        productionActive = false; q = 0;
-                        const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
-                    } else {
-                        const vol = q * 30.44; remReserves += vol; cumForecast += vol;
-                        const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m);
-                        forecastTableData.push({ date: d, q: q, vol: vol, cum: cumForecast });
-                    }
-                    m++;
-                }
-            } else { // Daily
-                let d_count = 0;
-                while(productionActive && d_count < 3650) { 
-                     const t_forecast_eff = d_count / 30.44;
-                     let q = 0;
-                     // Use Di_m_forecast
-                     if(b === 0) q = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
-                     else {
-                         const base = 1 + b * Di_m_forecast * t_forecast_eff;
-                         if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
-                     }
-                     if(q < q_el) { 
-                         productionActive = false; q = 0;
-                         const d = new Date(startDateInput); d.setDate(startDateInput.getDate() + d_count); eolDate = d.toLocaleDateString();
-                     } else {
-                         const vol = q * 1; remReserves += vol; cumForecast += vol;
-                         const d = new Date(startDateInput); d.setDate(startDateInput.getDate() + d_count);
-                         forecastTableData.push({ date: d, q: q, vol: vol, cum: cumForecast });
-                     }
-                     d_count++;
-                }
-            }
-            if(eolDate === "-") eolDate = "> 100 Years";
-
-            return { fitLine, forecastLine, forecastTableData, histCum, remReserves, eolDate };
-        }
-
         async function runRegression() {
             if(historyData.length < 3) { alert("Need at least 3 historical data points."); return; }
             
             const useWindow = document.getElementById('check-reg-window').checked;
             let regressionData = [];
             const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
-            
             let finalT = 0;
             
-            // BASE DATA
             const regSource = historyData.map(d => ({
                 t_months: d.t_months,
                 q: d.q * factor
@@ -1300,7 +1090,6 @@
 
             let bestSSE = Infinity;
             const bMax = 1.0; 
-            // DEFAULT B = 0 for regression init
             let bestParams = { qi: 1000, di: 20, b: 0 };
             
             let currentParams = {
@@ -1331,12 +1120,10 @@
                 temp *= 0.995;
             }
 
-            // Apply Regression Results to Match Parameters
             document.getElementById('input-qi').value = bestParams.qi;
             document.getElementById('input-di').value = bestParams.di;
             document.getElementById('input-b').value = bestParams.b;
 
-            // CALCULATE FITTED END RATE
             const Di_m_best = (bestParams.di / 100) / 12;
             let q_final_fit = 0;
             if (bestParams.b === 0) {
@@ -1354,19 +1141,19 @@
             }
 
             ['qi', 'di', 'b'].forEach(id => { 
-                document.getElementById(`input-${id}-num`).value = parseFloat(document.getElementById(`input-${id}`).value).toFixed(2); 
+                const el = document.getElementById(`input-${id}-num`);
+                if(el) el.value = parseFloat(document.getElementById(`input-${id}`).value).toFixed(2); 
             });
             
             updateDCA(false);
             document.getElementById('loadingOverlay').style.display = 'none';
         }
 
-        // ... rest of the helper functions remain similar but verify no references to old toggle ...
         function calculateSSE(p, dataSubset) {
             let sse = 0;
             const Di_m = (p.di / 100) / 12;
             for(let i=0; i<dataSubset.length; i++) {
-                const t = dataSubset[i].t_months; // Already normalized if useWindow is true
+                const t = dataSubset[i].t_months; 
                 const actual = dataSubset[i].q;
                 let model = 0;
                 
@@ -1436,24 +1223,239 @@
             document.body.removeChild(link);
         }
 
+        // --- CALCULATION ---
+        function calculateDCA() {
+            const qi = parseFloat(document.getElementById('input-qi').value);
+            const Di_pct_yr = parseFloat(document.getElementById('input-di').value);
+            const b = parseFloat(document.getElementById('input-b').value);
+            const forecastMonthsSlider = parseFloat(document.getElementById('input-months').value);
+            const q_el = parseFloat(document.getElementById('input-el').value);
+            const startDateInput = document.getElementById('input-date-start').valueAsDate || new Date();
+            const Di_m = (Di_pct_yr / 100) / 12;
+
+            // DETERMINE TIME OFFSET IF REGRESSION WINDOW IS ACTIVE
+            const useWindow = document.getElementById('check-reg-window').checked;
+            let t_offset_fit = 0;
+            let startIndexForFit = 0; 
+            let endIndexForFit = historyData.length - 1; 
+            
+            let t_reg_start_months = 0; 
+
+            if (useWindow && historyData.length > 0) {
+                const regStartIdx = parseInt(document.getElementById('input-reg-start').value);
+                const regEndIdx = parseInt(document.getElementById('input-reg-end').value);
+                
+                if (historyData[regStartIdx]) {
+                    t_offset_fit = historyData[regStartIdx].t_months;
+                    t_reg_start_months = historyData[regStartIdx].t_months;
+                    startIndexForFit = regStartIdx;
+                }
+                if (historyData[regEndIdx]) {
+                    endIndexForFit = regEndIdx; 
+                }
+            } else if (historyData.length > 0) {
+                t_reg_start_months = historyData[0].t_months;
+            }
+
+            let histCum = 0;
+            const fitLine = [];
+            const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
+            
+            // --- NEW: CALC METHOD (Time-Step vs Simple Sum) ---
+            const calcMethod = document.querySelector('input[name="calcMethod"]:checked').value;
+
+            if (historyData.length > 0) {
+                for(let i=0; i<historyData.length; i++) {
+                     let days = 1; // Default to 1 for simple sum
+
+                     if (calcMethod === 'time') {
+                         const d = historyData[i].date;
+                         const daysInCalendarMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+                         
+                         let gapDays = 0;
+                         if (i < historyData.length - 1) {
+                             gapDays = (historyData[i+1].date - d) / (1000 * 60 * 60 * 24);
+                         } else {
+                             gapDays = (i > 0) ? (d - historyData[i-1].date) / (1000 * 60 * 60 * 24) : daysInCalendarMonth;
+                         }
+
+                         // Hybrid Logic for Monthly vs Daily
+                         if (gapDays >= 27 && gapDays <= 33) {
+                              days = daysInCalendarMonth;
+                         } else {
+                              days = gapDays;
+                         }
+                         if(days <= 0) days = 1;
+                     }
+
+                     const val = historyData[i].q * factor;
+                     const vol = val * days; 
+                     histCum += vol; 
+
+                     // MATCH LINE CALCULATION (Uses qi)
+                     if (i >= startIndexForFit && i <= endIndexForFit) {
+                         const t = historyData[i].t_months;
+                         const t_eff = t - t_offset_fit;
+                         let q_model = 0;
+                         if (b === 0) {
+                             q_model = qi * Math.exp(-Di_m * t_eff);
+                         } else {
+                             const base = 1 + b * Di_m * t_eff;
+                             if (base > 0) {
+                                 q_model = qi / Math.pow(base, (1/b));
+                             } else {
+                                 q_model = null; 
+                             }
+                         }
+                         if (q_model !== null) {
+                            fitLine.push({ t: t, q: q_model, date: historyData[i].date });
+                         }
+                     }
+                }
+            }
+
+            const forecastLine = []; 
+            const forecastTableData = []; 
+            let remReserves = 0;
+            let eolDate = "-";
+            
+            // Forecast Calculation
+            let t_forecast_start_relative_to_hist = 0;
+            if(historyData.length > 0) {
+                const startHist = historyData[0].date;
+                t_forecast_start_relative_to_hist = (startDateInput - startHist) / (1000 * 60 * 60 * 24 * 30.44);
+            }
+            
+            const t_elapsed_since_reg_start = t_forecast_start_relative_to_hist - t_reg_start_months;
+            
+            let Di_m_forecast = Di_m;
+            if (b > 0) {
+                const denom = 1 + b * Di_m * t_elapsed_since_reg_start;
+                if (denom > 0) {
+                    Di_m_forecast = Di_m / denom;
+                }
+            }
+
+            const qi_forecast = parseFloat(document.getElementById('input-qi-forecast').value);
+
+            for(let m = 0; m <= forecastMonthsSlider; m++) {
+                const t_forecast_eff = m; 
+                let q_calc = 0;
+                
+                if (b === 0) {
+                     q_calc = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
+                } else {
+                     const base = 1 + b * Di_m_forecast * t_forecast_eff;
+                     if (base > 0) {
+                        q_calc = qi_forecast / Math.pow(base, (1/b));
+                     } else {
+                        q_calc = 0;
+                     }
+                }
+                
+                if(q_calc < q_el) q_calc = 0; 
+
+                const currentD = new Date(startDateInput);
+                currentD.setMonth(startDateInput.getMonth() + m);
+                forecastLine.push({ q: q_calc, date: currentD });
+            }
+
+            let cumForecast = 0;
+            let m = 0;
+            let productionActive = true;
+            
+            if(tableView === 'year') {
+                let yearVol = 0; let monthsInYear = 0; let yearCount = 1;
+                while(productionActive && m < 1200) {
+                    const t_forecast_eff = m;
+                    let q = 0;
+                    
+                    if(b === 0) q = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
+                    else {
+                        const base = 1 + b * Di_m_forecast * t_forecast_eff;
+                        if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
+                    }
+
+                    if(q < q_el) {
+                        productionActive = false; q = 0;
+                        const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
+                    } else {
+                        const vol = q * 30.44; yearVol += vol; remReserves += vol; cumForecast += vol; monthsInYear++;
+                        if ((m + 1) % 12 === 0) {
+                            forecastTableData.push({ 
+                                label: `Year ${yearCount}`, q: yearVol/365.25, vol: yearVol, cum: cumForecast, isYearly: true
+                            });
+                            yearVol = 0; monthsInYear = 0; yearCount++;
+                        }
+                    }
+                    m++;
+                }
+                if(yearVol > 0) {
+                   forecastTableData.push({ 
+                       label: `Year ${yearCount}`, q: yearVol/(monthsInYear*30.44), vol: yearVol, cum: cumForecast, isYearly: true 
+                   });
+                }
+            } else if(tableView === 'month') {
+                while(productionActive && m < 1200) {
+                    const t_forecast_eff = m;
+                    let q = 0;
+                    if(b === 0) q = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
+                    else {
+                        const base = 1 + b * Di_m_forecast * t_forecast_eff;
+                        if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
+                    }
+                    if(q < q_el) {
+                        productionActive = false; q = 0;
+                        const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m); eolDate = d.toLocaleDateString();
+                    } else {
+                        const vol = q * 30.44; remReserves += vol; cumForecast += vol;
+                        const d = new Date(startDateInput); d.setMonth(startDateInput.getMonth() + m);
+                        forecastTableData.push({ date: d, q: q, vol: vol, cum: cumForecast });
+                    }
+                    m++;
+                }
+            } else { // Daily
+                let d_count = 0;
+                while(productionActive && d_count < 3650) { 
+                     const t_forecast_eff = d_count / 30.44;
+                     let q = 0;
+                     if(b === 0) q = qi_forecast * Math.exp(-Di_m_forecast * t_forecast_eff);
+                     else {
+                         const base = 1 + b * Di_m_forecast * t_forecast_eff;
+                         if(base > 0) q = qi_forecast / Math.pow(base, (1/b));
+                     }
+                     if(q < q_el) { 
+                         productionActive = false; q = 0;
+                         const d = new Date(startDateInput); d.setDate(startDateInput.getDate() + d_count); eolDate = d.toLocaleDateString();
+                     } else {
+                         const vol = q * 1; remReserves += vol; cumForecast += vol;
+                         const d = new Date(startDateInput); d.setDate(startDateInput.getDate() + d_count);
+                         forecastTableData.push({ date: d, q: q, vol: vol, cum: cumForecast });
+                     }
+                     d_count++;
+                }
+            }
+            if(eolDate === "-") eolDate = "> 100 Years";
+
+            return { fitLine, forecastLine, forecastTableData, histCum, remReserves, eolDate };
+        }
+
         function updateDCA(isRegression = false) {
             const res = calculateDCA();
             currentForecastData = res.forecastTableData; 
             const volDiv = fluidType === 'gas' ? 1000 : 1000;
             
-            document.getElementById('res-eur').innerText = ((res.histCum + res.remReserves)/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
-            document.getElementById('res-rem').innerText = (res.remReserves/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
-            document.getElementById('res-cum').innerText = (res.histCum/volDiv).toLocaleString(undefined, {maximumFractionDigits:1});
+            document.getElementById('res-eur').innerText = ((res.histCum + res.remReserves)/volDiv).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits:2});
+            document.getElementById('res-rem').innerText = (res.remReserves/volDiv).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits:2});
+            document.getElementById('res-cum').innerText = (res.histCum/volDiv).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits:2});
             document.getElementById('res-eol').innerText = res.eolDate;
 
-            // Update New Card (Decline Info) with 2 Decimal Places
             const valDi = parseFloat(document.getElementById('input-di').value);
             const valB = parseFloat(document.getElementById('input-b').value);
             
             document.getElementById('res-di').innerText = valDi.toFixed(2);
             document.getElementById('res-b').innerText = valB.toFixed(2);
 
-            // Table Render
             const tbody = document.getElementById('forecastTableBody');
             tbody.innerHTML = '';
             const renderLimit = 200;
@@ -1475,7 +1477,6 @@
                 tbody.appendChild(tr);
             }
 
-            // Plot
             const isLog = document.getElementById('logScaleToggle').checked;
             const showChoke = document.getElementById('showChokeToggle').checked;
             const factor = (fluidType === 'gas' && gasInputUnit === 'mscfd') ? 0.001 : 1.0;
@@ -1486,7 +1487,6 @@
                 marker: { color: '#333', size: 5, symbol: 'circle' }
             };
 
-            // PLOT CHOKE SIZE
             const chokeX = [], chokeY = [];
             if(showChoke) {
                 historyData.forEach(d => { if(d.choke > 0) { chokeX.push(d.date); chokeY.push(d.choke); } });
